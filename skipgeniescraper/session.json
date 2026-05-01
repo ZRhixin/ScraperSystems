@@ -1,0 +1,53 @@
+{
+  "storage": {
+    "localStorage": {
+      "_grecaptcha": "09AKhCRwjV2YMut063G3y1plxuD20isifvlPCELuHLpXn0o77MJlmfUAhjJrlFqHLg_vJmmGqCgWUNWx9nTw8go9T2UOSLJxzOFvi1WA7kePtBMkDMr7N_e8qlYUzxxwDV",
+      "persist:root": "{\"auth\":\"{\\\"id\\\":\\\"67f42b273541fcd5f9de4076\\\",\\\"firstname\\\":\\\"\\\",\\\"lastname\\\":\\\"\\\",\\\"email\\\":\\\"tom@trustedheirsolutions.com\\\",\\\"profile_image\\\":\\\"https://web.skipgenie.com/api/images/users.png\\\",\\\"role\\\":3,\\\"mobile\\\":\\\"4075023160\\\",\\\"address\\\":\\\"777 Brickell Ave\\\",\\\"token\\\":\\\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjQyYjI3MzU0MWZjZDVmOWRlNDA3NiIsImVtYWlsIjoidG9tQHRydXN0ZWRoZWlyc29sdXRpb25zLmNvbSIsInJvbGUiOjMsImZ1bGxuYW1lIjoiSmFtZXMgRGVsbGEgRmVtaW5hIiwibW9iaWxlIjoiNDA3NTAyMzE2MCIsInBob25lX2NvZGUiOiIiLCJhZGRyZXNzIjoiNzc3IEJyaWNrZWxsIEF2ZSIsImNvbXBhbnkiOiIiLCJjaXR5IjoiTWlhbWkiLCJjb3VudHJ5IjoiIiwic3RhdGUiOiIiLCJ6aXAiOjMzMTMxLCJiaWxsaW5nX2FkZHJlc3MiOnsiZW1haWwiOiJ0bWhvbWVidXllcmxtQGdtYWlsLmNvbSIsImNvdW50cnkiOiIyMzMiLCJzdGF0ZSI6IjE0MzYiLCJjaXR5IjoiTWlhbWkiLCJ6aXAiOiIzMzEzMSIsImFkZHJlc3MiOiI3NzcgQnJpY2tlbGwgQXZlIiwiY29tcGFueSI6Ii4uIn0sInVzZXJfYWNjZXNzIjoiIiwiaXNfbWFpbF92ZXJpZmllZCI6IiIsImlzX3BsYW5fYWN0aXZlIjp0cnVlLCJzZXR0aW5nIjp7fSwiaWF0IjoxNzc2Njk0OTM2LCJleHAiOjE3NzY3ODEzMzZ9.VA5qSKYdct25m04DFd5RTlXT-902e_4icuDOnknoawE\\\",\\\"tempToken\\\":\\\"\\\",\\\"setting\\\":{},\\\"city\\\":\\\"Miami\\\",\\\"country\\\":\\\"\\\",\\\"state\\\":\\\"\\\",\\\"zip\\\":33131,\\\"company\\\":\\\"\\\",\\\"active_plan\\\":{\\\"_id\\\":\\\"67f42b273541fcd5f9de407e\\\",\\\"user_id\\\":\\\"67f42b273541fcd5f9de4076\\\",\\\"plan_id\\\":\\\"67f00c922003b0d6380cf79c\\\",\\\"plan_info\\\":{\\\"_id\\\":\\\"67f00c922003b0d6380cf79c\\\",\\\"name\\\":\\\"Unlimited\\\",\\\"price\\\":99,\\\"status\\\":1,\\\"privacy\\\":0,\\\"search_type\\\":\\\"FIXED\\\",\\\"is_skip\\\":\\\"YES\\\",\\\"skip_credit\\\":{\\\"included\\\":{\\\"search_count\\\":1000,\\\"rollover\\\":\\\"YES\\\"},\\\"monthly\\\":{\\\"search_count\\\":1000,\\\"rollover\\\":\\\"YES\\\"}},\\\"is_smart\\\":\\\"NO\\\",\\\"smart_credit\\\":{\\\"included\\\":{\\\"search_count\\\":0,\\\"rollover\\\":\\\"NO\\\"},\\\"monthly\\\":{\\\"search_count\\\":0,\\\"rollover\\\":\\\"NO\\\"}},\\\"api_status\\\":\\\"NO\\\",\\\"payment_type\\\":\\\"RECURRING\\\",\\\"recurring_cycle\\\":\\\"MONTHLY\\\",\\\"custom_days\\\":0,\\\"plan_type\\\":1,\\\"is_playlist\\\":\\\"NO\\\",\\\"playlist_ids\\\":[],\\\"active_plan_ids\\\":[],\\\"is_coaching\\\":\\\"YES\\\",\\\"created_at\\\":\\\"2025-04-04T16:45:06.989Z\\\",\\\"updated_at\\\":\\\"2025-04-04T16:45:06.989Z\\\",\\\"__v\\\":0},\\\"status\\\":1,\\\"start_date\\\":\\\"2026-04-06T00:00:00.000Z\\\",\\\"end_date\\\":\\\"2026-05-06T00:00:00.000Z\\\",\\\"plan_price\\\":99,\\\"discount_amount\\\":0,\\\"discount_id\\\":null,\\\"invoice\\\":\\\"SBN-766493\\\",\\\"subscription_id\\\":42671995,\\\"subscription_status\\\":\\\"active\\\",\\\"customerPaymentProfileId\\\":1973456716,\\\"created_at\\\":\\\"2025-04-07T19:44:39.373Z\\\",\\\"updated_at\\\":\\\"2025-04-07T19:44:39.373Z\\\",\\\"__v\\\":0},\\\"total_credit\\\":0,\\\"userPreview\\\":{},\\\"is_mail_verified\\\":\\\"\\\",\\\"billing_address\\\":{\\\"email\\\":\\\"tmhomebuyerlm@gmail.com\\\",\\\"country\\\":\\\"233\\\",\\\"state\\\":\\\"1436\\\",\\\"city\\\":\\\"Miami\\\",\\\"zip\\\":\\\"33131\\\",\\\"address\\\":\\\"777 Brickell Ave\\\",\\\"company\\\":\\\"..\\\"},\\\"termsandcondition\\\":false,\\\"fullname\\\":\\\"James Della Femina\\\",\\\"phone_code\\\":\\\"\\\",\\\"user_access\\\":\\\"\\\",\\\"is_plan_active\\\":true,\\\"credits\\\":{\\\"skipcredit\\\":389,\\\"smartcredit\\\":104},\\\"mfaEnabled\\\":false,\\\"isMFAConfigured\\\":false,\\\"emailOtpEnabled\\\":false,\\\"mobileOtpEnabled\\\":false}\",\"menu\":\"{\\\"activePage\\\":\\\"dashboard\\\",\\\"activePageTitle\\\":\\\"Dashboard\\\",\\\"activeStep1\\\":\\\"\\\",\\\"activeStep2\\\":\\\"\\\"}\",\"_persist\":\"{\\\"version\\\":1,\\\"rehydrated\\\":true}\"}",
+      "device_id": "c5d37d46-fabc-48c7-8fad-016f64278eb5"
+    },
+    "sessionStorage": {}
+  },
+  "cookies": [
+    {
+      "name": "_GRECAPTCHA",
+      "value": "09AKhCRwinlcXeoJSEW2afmnI9yotNftg80J5FHKKaVkjr8jEtsTtZME4XFpQt8q7QHYSjXMiWfiSwXkQS7WyrbL0",
+      "domain": "www.google.com",
+      "path": "/recaptcha",
+      "expires": 1792246893.230573,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "email",
+      "value": "tom@trustedheirsolutions.com",
+      "domain": "web.skipgenie.com",
+      "path": "/",
+      "expires": 1776709334,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "pass",
+      "value": "!jkL4Amn48rtQKQ",
+      "domain": "web.skipgenie.com",
+      "path": "/",
+      "expires": 1776709334,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "utoken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjQyYjI3MzU0MWZjZDVmOWRlNDA3NiIsImVtYWlsIjoidG9tQHRydXN0ZWRoZWlyc29sdXRpb25zLmNvbSIsInJvbGUiOjMsImZ1bGxuYW1lIjoiSmFtZXMgRGVsbGEgRmVtaW5hIiwibW9iaWxlIjoiNDA3NTAyMzE2MCIsInBob25lX2NvZGUiOiIiLCJhZGRyZXNzIjoiNzc3IEJyaWNrZWxsIEF2ZSIsImNvbXBhbnkiOiIiLCJjaXR5IjoiTWlhbWkiLCJjb3VudHJ5IjoiIiwic3RhdGUiOiIiLCJ6aXAiOjMzMTMxLCJiaWxsaW5nX2FkZHJlc3MiOnsiZW1haWwiOiJ0bWhvbWVidXllcmxtQGdtYWlsLmNvbSIsImNvdW50cnkiOiIyMzMiLCJzdGF0ZSI6IjE0MzYiLCJjaXR5IjoiTWlhbWkiLCJ6aXAiOiIzMzEzMSIsImFkZHJlc3MiOiI3NzcgQnJpY2tlbGwgQXZlIiwiY29tcGFueSI6Ii4uIn0sInVzZXJfYWNjZXNzIjoiIiwiaXNfbWFpbF92ZXJpZmllZCI6IiIsImlzX3BsYW5fYWN0aXZlIjp0cnVlLCJzZXR0aW5nIjp7fSwiaWF0IjoxNzc2Njk0OTM2LCJleHAiOjE3NzY3ODEzMzZ9.VA5qSKYdct25m04DFd5RTlXT-902e_4icuDOnknoawE",
+      "domain": "web.skipgenie.com",
+      "path": "/",
+      "expires": 1776709334,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "url": "https://web.skipgenie.com/user/search#"
+}

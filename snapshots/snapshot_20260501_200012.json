@@ -1,0 +1,418 @@
+{
+  "properties": [
+    {
+      "id": 1,
+      "parcel_id": "0029590",
+      "county": "Wake",
+      "state_code": "NC",
+      "address": "631 E NELSON AVE, WAKE FOREST",
+      "scout_completed_at": "2026-04-29T19:35:54.113673",
+      "investigation_status": "pending",
+      "chain_conclusion_id": 1,
+      "created_at": "2026-04-29T19:35:54.113673",
+      "updated_at": "2026-05-01T11:47:06.681784",
+      "secondary_parcel_id": "1841726274",
+      "street": "631 E NELSON AVE",
+      "city": "WAKE FOREST",
+      "state": null,
+      "zip": null,
+      "current_owners": [
+        {
+          "raw_name": "HAYES, LYDIA HEIRS",
+          "owner_order": 1
+        }
+      ],
+      "short_legal_raw": null,
+      "subdivision": null,
+      "block": null,
+      "lot": null,
+      "plat_book": null,
+      "plat_page": null,
+      "full_legal_description": null,
+      "last_sale_date": "1997-05-13",
+      "extraction_notes": [
+        "County inferred from Wake County assessor source.",
+        "Property address state and ZIP not shown; left null.",
+        "Assessor lists deed_date 5/13/1997; used as last_sale_date.",
+        "deed_book_page shown as '-E-  -' and could not be parsed; book/page left null.",
+        "No legal description provided on assessor result.",
+        "Assessor result shows a 'mailing_address' value of 'ALYCE HAYES' which appears to be a name rather than an address; not included due to schema."
+      ]
+    }
+  ],
+  "appraiser_transfer_history": [],
+  "rod_captures": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC100471725//006511-00265-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "006511",
+      "page": "00265",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpbz3x17jl.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-04-29T19:37:16.923490",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-04-29T19:37:16.923490",
+      "updated_at": "2026-04-29T19:38:46.279128"
+    },
+    {
+      "id": 2,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC106989884//000913-00352-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "000913",
+      "page": "00354",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpnort2_hl.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-04-29T19:37:22.114750",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-04-29T19:37:22.114750",
+      "updated_at": "2026-04-29T19:38:22.508152"
+    },
+    {
+      "id": 3,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC106695809//001155-00171-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "001155",
+      "page": "00171",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpywkpfutn.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-04-29T19:37:27.188576",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-04-29T19:37:27.188576",
+      "updated_at": "2026-04-29T19:39:04.435537"
+    },
+    {
+      "id": 4,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC107022581//000860-00053-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "000860",
+      "page": "00053",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpc7pt78dp.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-04-29T19:41:03.513825",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-04-29T19:41:03.513825",
+      "updated_at": "2026-04-29T19:41:07.891061"
+    }
+  ],
+  "court_captures": [],
+  "document_extractions": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "rod_capture_id": 2,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "W. W. Holding and wife, Josephine H. Holding"
+      ],
+      "grantee_names": [
+        "Lydia Hayes"
+      ],
+      "recorded_date": "1944-11-06",
+      "instrument_date": "1944-08-01",
+      "book": "913",
+      "page": "354",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "BEGINNING at a stake on the North Side of Fort Street, Dennis Kearney's corner and running along said street in an Easterly direction sixty (60) feet; thence in a Northerly direction along the line of land of J. R. Mangum one hundred twenty (120) feet and three (3) inches; thence in a Westerly direction along the line of land of Will Debnam sixty (60) feet to a stake Dennis Kearney's line; thence in a Southerly direction along the line of land of Dennis Kearney one hundred twenty (120) feet and three (3) inches to the point of BEGINNING, Together with the right to the use of a well situated between the above described lot and a lot described as belonging to J. R. Mangum.",
+      "legal_description_short": "60x120 ft lot on North Side of Fort Street, Wake Forest, Wake County, NC; adjoining lands of Dennie Kearney, Will Debnam, J. R. Mangum and others",
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": null,
+      "references_prior_deed_page": null,
+      "references_prior_deed_language": null,
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "metes_bounds",
+      "legal_match_notes": "No parcel ID or plat reference available in this deed to confirm match to parcel 0029590. The deed describes a metes-and-bounds lot in Wake Forest, Wake County by adjoining landowners only. Cannot confirm or deny match without additional parcel data.",
+      "extraction_confidence": "medium",
+      "summary": "Warranty deed dated August 1, 1944 from W. W. Holding and wife Josephine H. Holding to Lydia Hayes conveying a 60x120 ft lot on the North Side of Fort Street in Wake Forest, Wake County, NC; recorded November 6, 1944 in Book 913 at page 354. This document is the third of three instruments recorded on the same pages; the first two pages contain a separate deed from Kathryn Baker Cummings and husband Paul Cummings to D. A. Baker and wife Annie B. Baker recorded at Book 913 page 352.",
+      "flags": [
+        "multi_parcel_conveyance",
+        "missing_critical_field"
+      ],
+      "created_at": "2026-04-29T19:38:22.508152",
+      "updated_at": "2026-04-29T19:38:22.508152"
+    },
+    {
+      "id": 2,
+      "property_id": 1,
+      "rod_capture_id": 1,
+      "court_capture_id": null,
+      "document_type": "other",
+      "grantor_names": [
+        "Lydia Hayes (widow)"
+      ],
+      "grantee_names": [
+        "Wake County"
+      ],
+      "recorded_date": null,
+      "instrument_date": "1995-04-13",
+      "book": "6511",
+      "page": "265",
+      "instrument_number": "000406",
+      "vesting_language": null,
+      "legal_description_full": null,
+      "legal_description_short": null,
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "6271",
+      "references_prior_deed_page": "345",
+      "references_prior_deed_language": "secured by a Deed of Trust dated the same day as the Note in the original principal amount of Twenty-nine Thousand and no/100 Dollars ($29,000.00) by and among Borrower, Lender and Trustee (the \"Deed of Trust\") encumbering certain real property in Wake County, North Carolina as described therein (the \"Property\") and recorded in Book 6271, Page 345, Wake County Registry",
+      "legal_match_to_parcel": "none",
+      "legal_match_method": "none",
+      "legal_match_notes": "No legal description is included in this document. The property is referenced only by citation to the prior Deed of Trust recorded at Book 6271, Page 345. No parcel ID, lot, subdivision, or metes-and-bounds description is present to match against the parcel reference provided.",
+      "extraction_confidence": "high",
+      "summary": "Modification Agreement for a Deferred Payment Loan dated April 13, 1995, between Borrower Lydia Hayes (widow), Trustee E. Richard Jones Jr., and Lender Wake County, modifying the original Promissory Note and Deed of Trust (Book 6271, Page 345) to increase the principal amount to $29,225.90 and revise the payment schedule; recorded at Book 6511, Page 265, Wake County Registry.",
+      "flags": [
+        "references_unretrieved_prior_deed",
+        "missing_critical_field"
+      ],
+      "created_at": "2026-04-29T19:38:46.279128",
+      "updated_at": "2026-04-29T19:38:46.279128"
+    },
+    {
+      "id": 3,
+      "property_id": 1,
+      "rod_capture_id": 3,
+      "court_capture_id": null,
+      "document_type": "quitclaim",
+      "grantor_names": [
+        "Viola Hicks (widow)"
+      ],
+      "grantee_names": [
+        "Lydia Hayes, her heirs and assigns"
+      ],
+      "recorded_date": "1954-06-17",
+      "instrument_date": "1954-06-15",
+      "book": "1155",
+      "page": "171",
+      "instrument_number": null,
+      "vesting_language": "to the said Lydia Hayes, her heirs and assigns, to her only use and behoof forever",
+      "legal_description_full": "BEGINNING at a stake on the North side of Fort Street (now called Nelson Street), now or formerly Dennis Kearney's corner, and running along said Street in an Easterly direction, 60 feet; thence in a Northerly direction, along line of lands of J. R. Mangum, formerly, now Viola Hicks, 120 feet and 3 inches; thence in a Westerly direction along line of land of Will Debnam, 60 feet to a stake, in Dennis Kearney's line; thence, in a Southerly direction, along line of the Kearney land, 120 feet 3 inches, to the point of BEGINNING.",
+      "legal_description_short": "Lot on North side of Fort Street (now Nelson Street), Town of Wake Forest, Wake County, NC; 60 ft x 120 ft 3 in parcel bounded by Kearney, Mangum/Hicks, and Debnam lines.",
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "860",
+      "references_prior_deed_page": "53",
+      "references_prior_deed_language": "on February 3, 1941, W. W. Holding and wife, Josephine H. Holding, executed and delivered a deed to Viola Hicks, conveying a certain lot or lots of land situated in the Town of Wake Forest, Wake County and State of North Carolina, which said deed was duly recorded in the Office of Register of Deeds for Wake County, North Carolina, in Book 860, at page 53",
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "metes_bounds",
+      "legal_match_notes": "No plat book/page or lot number provided in parcel_reference to cross-check. Legal description is metes-and-bounds for a parcel in Town of Wake Forest, Wake County, NC. Cannot confirm match to parcel 0029590 without additional reference data. Match rated low due to absence of subdivision/lot identifiers in both the document and parcel_reference.",
+      "extraction_confidence": "medium",
+      "summary": "Quitclaim deed dated June 15, 1954, from Viola Hicks (widow) to Lydia Hayes, conveying a lot on the north side of Fort Street (now Nelson Street) in the Town of Wake Forest, Wake County, NC. The deed was executed to correct a mutual mistake in a prior 1941 deed (Book 860, Page 53) that inadvertently included this lot, which had already been separately conveyed to Lydia Hayes by deed recorded in Book 913, Page 354; recorded June 17, 1954 at Book 1155, Page 171.",
+      "flags": [
+        "corrective_or_quitclaim_deed",
+        "references_unretrieved_prior_deed",
+        "low_ocr_readability"
+      ],
+      "created_at": "2026-04-29T19:39:04.435537",
+      "updated_at": "2026-04-29T19:39:04.435537"
+    },
+    {
+      "id": 4,
+      "property_id": 1,
+      "rod_capture_id": 4,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "W. W. Holding",
+        "Josephine A. Holding"
+      ],
+      "grantee_names": [
+        "Viola Hicks"
+      ],
+      "recorded_date": "1941-07-11",
+      "instrument_date": "1941-02-03",
+      "book": "860",
+      "page": "53",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "BEGINS AT A STONE ON WEST SIDE OF ROAD FROM W. O. ALLEN'S PLACE TO CHURCH STREET IN THE TOWN OF WAKE FOREST AND RUNS ALONG THE WESTERN BOUNDRY OF SAID ROAD N. 1/2 DEGREE E. 2 11/100 CHAINS TO A STONE WILL DEBNAM'S SOUTH EAST CORNER; THENCE WITH HIS LINE N. 65 DEGREES W. 1 73/100 CHAINS TO A STONE CHAMPION KEARNEY'S CORNER; THENCE WITH HIS LINE S. 15 DEGREES WEST 2 CHAINS TO A STONE ON NORTH SIDE OF EAST PINE STREET OF SAID TOWN; THENCE WITH THE NORTHERN BOUNDARY OF SAID STREET S. 65 DEGREES E. 2 19/100 CHAINS TO THE BEGINNING. BEING LOTS 19 AND 19A OF LANDS CONVEYED TO MOSES FORT BY MRS. M. E. SIMMONS, H. A. CHAPPELL, SURVEYOR, RECORDED IN OFFICE OF REGISTER OF DEEDS FOR WAKE COUNTY, IN BOOK 232, AT PAGE 297 AND BOOK 657, AT PAGE 368, AND BOOK 856 AT PAGE 598.",
+      "legal_description_short": "Lots 19 and 19A, Town of Wake Forest, Wake County, NC",
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": true,
+      "parcels_conveyed_count": 2,
+      "references_prior_deed_book": "856",
+      "references_prior_deed_page": "598",
+      "references_prior_deed_language": "BEING LOTS 19 AND 19A OF LANDS CONVEYED TO MOSES FORT BY MRS. M. E. SIMMONS, H. A. CHAPPELL, SURVEYOR, RECORDED IN OFFICE OF REGISTER OF DEEDS FOR WAKE COUNTY, IN BOOK 232, AT PAGE 297 AND BOOK 657, AT PAGE 368, AND BOOK 856 AT PAGE 598.",
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "narrative",
+      "legal_match_notes": "No parcel_reference short_legal or lot/block/plat data provided to match against. Document conveys Lots 19 and 19A in Wake Forest by metes-and-bounds with narrative lot identification. Cannot confirm match to parcel 0029590 without additional reference data. Multi-parcel conveyance adds ambiguity.",
+      "extraction_confidence": "medium",
+      "summary": "Warranty deed dated February 3, 1941 from W. W. Holding and wife Josephine A. Holding to Viola Hicks conveying Lots 19 and 19A in the Town of Wake Forest, Wake County, NC, described by metes and bounds; recorded July 11, 1941 in Book 860, Page 53.",
+      "flags": [
+        "handwritten_document",
+        "cursive_or_old_formatting",
+        "multi_parcel_conveyance",
+        "references_unretrieved_prior_deed"
+      ],
+      "created_at": "2026-04-29T19:41:07.891061",
+      "updated_at": "2026-04-29T19:41:07.891061"
+    }
+  ],
+  "investigation_sessions": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "status": "flagged_for_review",
+      "current_phase": "A",
+      "started_at": "2026-04-29T19:36:22.740568",
+      "completed_at": "2026-04-29T19:54:14.694446",
+      "iteration_count": 0,
+      "stop_reason": "estate_path_unresolved",
+      "created_at": "2026-04-29T19:36:22.740568",
+      "updated_at": "2026-04-29T19:54:14.694446"
+    }
+  ],
+  "investigation_questions": [
+    {
+      "id": 1,
+      "session_id": 1,
+      "question": "Current owner shows as 'HAYES, LYDIA HEIRS'. No acquisition deed into the heirs is recorded. I verified Lydia Hayes' acquisition by warranty deed from W. W. Holding (capture_id 2, extraction_id 1; Wake Book 913, Page 354, 11/6/1944) and confirmed the grantor\u2019s standing via (a) Holding\u2019s earlier 1941 deed describing adjacent/related lots (capture_id 4, extraction_id 4; Wake Book 860, Page 53) and (b) a corrective quitclaim from Viola Hicks back to Lydia clarifying the overlap (capture_id 3, extraction_id 3; Wake Book 1155, Page 171). However, I cannot locate any deed of distribution, executor\u2019s deed, or heirship instrument transferring title from Lydia to her heirs. Searched Wake ROD name results and NC court portal for an estate for LYDIA HAYES (including variants) without success. Need probate or other instrument to establish how title moved from Lydia to her heirs.",
+      "actions_taken": [],
+      "resolution": null,
+      "resolution_notes": null,
+      "created_at": "2026-04-29T19:54:08.017236",
+      "updated_at": "2026-04-29T19:54:08.017236"
+    }
+  ],
+  "investigation_trace": [],
+  "incidental_records": [],
+  "chain_conclusions": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "status": "active",
+      "current_owners": [
+        {
+          "raw_name": "HAYES, LYDIA HEIRS",
+          "is_deceased": true,
+          "normalized_name": "LYDIA HAYES",
+          "deceased_signals": [
+            {
+              "signal": "raw name ends with 'HEIRS'",
+              "evidence_extraction_id": null
+            },
+            {
+              "signal": "owner appears as 'Lydia Hayes (widow)' in grantor_names",
+              "evidence_extraction_id": 2
+            }
+          ],
+          "deceased_confidence": "confirmed"
+        }
+      ],
+      "acquisition_type": "deed",
+      "acquisition_document_refs": {
+        "primary_document": {
+          "book": "913",
+          "page": "354",
+          "document_type": "warranty_deed",
+          "extraction_id": 1,
+          "recorded_date": "1944-11-06"
+        },
+        "chain_back_document": null,
+        "supporting_documents": [
+          {
+            "role": "corrective",
+            "extraction_id": 3
+          },
+          {
+            "role": "other",
+            "extraction_id": 4
+          }
+        ]
+      },
+      "vesting": "sole",
+      "vesting_evidence": {
+        "extraction_id": 1,
+        "exact_language": "single grantee: Lydia Hayes"
+      },
+      "legal_description_confidence": "low",
+      "supporting_document_refs": [],
+      "flags": [
+        "multi_parcel_conveyance",
+        "missing_critical_field",
+        "references_unretrieved_prior_deed",
+        "corrective_or_quitclaim_deed",
+        "low_ocr_readability",
+        "handwritten_document",
+        "cursive_or_old_formatting",
+        "investigation_incomplete",
+        "phases_bc_not_completed",
+        "estate_path_unresolved",
+        "chain_back_not_found",
+        "primary_acquisition_low_legal_match",
+        "corrective_deed_in_chain",
+        "legal_description_low_confidence"
+      ],
+      "verify_status": "objection_raised",
+      "verify_objections": {
+        "objections": [
+          {
+            "problem": "Acquisition type is 'deed' and chain_back_document is null. Flags 'chain_back_not_found', 'investigation_incomplete', and 'phases_bc_not_completed' are present, indicating the chain-back grantor deed (W. W. Holding's source of title prior to 1944) was not searched/retrieved. Investigation must complete chain-back search before this can be finalized.",
+            "severity": "medium",
+            "evidence_citation": null,
+            "suggested_resolution": "return_to_investigate",
+            "claim_being_challenged": "chain_back_document is null for a deed acquisition"
+          },
+          {
+            "problem": "Primary extraction (Book 913 Page 354) has legal_match_to_parcel = 'low'. The conclusion has appropriately raised flag 'primary_acquisition_low_legal_match' and 'legal_description_low_confidence', but this remains a medium-severity concern: the deed cannot be definitively tied to parcel 0029590 without supplemental parcel evidence.",
+            "severity": "medium",
+            "evidence_citation": "1",
+            "suggested_resolution": "return_to_investigate",
+            "claim_being_challenged": "primary deed legal_match_to_parcel = 'low'"
+          },
+          {
+            "problem": "Extraction 3 (Book 1155 Page 171) is a quitclaim from Viola Hicks correcting a 1941 deed at Book 860 Page 53, NOT correcting the primary 1944 deed at Book 913 Page 354. Per the extraction summary, the 1941 deed (Book 860 Page 53) inadvertently included this lot which had already been conveyed to Lydia Hayes in 1944. Labeling extraction 3 as 'corrective' relative to the chain is misleading \u2014 it is a curative quitclaim resolving a cloud on title from the 1941 Holding-to-Hicks deed, not a correction of the primary deed. Role assignment should be re-evaluated.",
+            "severity": "medium",
+            "evidence_citation": "3",
+            "suggested_resolution": "human_review",
+            "claim_being_challenged": "Corrective/quitclaim deed (extraction 3) referenced as 'corrective' in supporting_documents"
+          },
+          {
+            "problem": "Extraction 2 grantor_names shows 'Lydia Hayes (widow)' as of April 13, 1995 \u2014 this confirms Lydia was a widow (her husband deceased), not that Lydia herself is deceased. The signal language as written ('Lydia Hayes (widow)') supports widowhood, not Lydia's own death. The deceased_confidence='confirmed' for Lydia Hayes is overclaimed; the only other signal ('name ends with HEIRS') is a name-pattern signal supporting probable but not confirmed death. Confidence should likely be 'probable' not 'confirmed'.",
+            "severity": "medium",
+            "evidence_citation": "2",
+            "suggested_resolution": "return_to_investigate",
+            "claim_being_challenged": "Deceased signal: 'owner appears as Lydia Hayes (widow) in grantor_names' cites extraction 2"
+          },
+          {
+            "problem": "The conclusion flags 'estate_path_unresolved' and lists Lydia Hayes as deceased with HEIRS, yet no probate/estate file or deed of distribution was retrieved or referenced. If Lydia is deceased, an estate search is required to determine if title passed by intestacy or testacy. This gap is acknowledged via the flag but should be resolved by completing the investigation.",
+            "severity": "medium",
+            "evidence_citation": null,
+            "suggested_resolution": "return_to_investigate",
+            "claim_being_challenged": "estate_path_unresolved flag present but no estate document retrieved"
+          }
+        ],
+        "reviewer_notes": "Conclusion is structurally sound for the primary acquisition (1944 warranty deed Holding to Lydia Hayes, sole grantee) but has multiple unresolved investigation gaps appropriately flagged. Most critical issues are the missing chain-back deed, the unresolved estate path for the deceased owner, and the questionable role labeling of extraction 3 as 'corrective' (it actually corrects a separate 1941 deed in a parallel chain, not the primary). The deceased_confidence='confirmed' is also overclaimed given the cited evidence only proves widowhood, not Lydia's death. Returning to Investigate to complete chain-back and estate searches would resolve most issues."
+      },
+      "superseded_by_id": null,
+      "created_at": "2026-05-01T11:47:06.681784",
+      "updated_at": "2026-05-01T11:52:31.623601"
+    }
+  ]
+}

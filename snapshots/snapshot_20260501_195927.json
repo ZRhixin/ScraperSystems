@@ -1,0 +1,55 @@
+{
+  "properties": [
+    {
+      "id": 1,
+      "parcel_id": "0029590",
+      "county": "Wake",
+      "state_code": "NC",
+      "address": "631 E NELSON AVE, WAKE FOREST",
+      "scout_completed_at": "2026-04-29T19:35:54.113673",
+      "investigation_status": "pending",
+      "chain_conclusion_id": 1,
+      "created_at": "2026-04-29T19:35:54.113673",
+      "updated_at": "2026-05-01T11:47:06.681784",
+      "secondary_parcel_id": "1841726274",
+      "street": "631 E NELSON AVE",
+      "city": "WAKE FOREST",
+      "state": null,
+      "zip": null,
+      "current_owners": [
+        {
+          "raw_name": "HAYES, LYDIA HEIRS",
+          "owner_order": 1
+        }
+      ],
+      "short_legal_raw": null,
+      "subdivision": null,
+      "block": null,
+      "lot": null,
+      "plat_book": null,
+      "plat_page": null,
+      "full_legal_description": null,
+      "last_sale_date": "1997-05-13",
+      "extraction_notes": [
+        "County inferred from Wake County assessor source.",
+        "Property address state and ZIP not shown; left null.",
+        "Assessor lists deed_date 5/13/1997; used as last_sale_date.",
+        "deed_book_page shown as '-E-  -' and could not be parsed; book/page left null.",
+        "No legal description provided on assessor result.",
+        "Assessor result shows a 'mailing_address' value of 'ALYCE HAYES' which appears to be a name rather than an address; not included due to schema."
+      ]
+    }
+  ],
+  "appraiser_transfer_history": [],
+  "rod_captures": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC100471725//006511-00265-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "006511",
+      "page": "00265",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpbz3x17jl.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 

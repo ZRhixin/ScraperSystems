@@ -1,0 +1,8 @@
+requests
+curl-cffi
+beautifulsoup4
+lxml
+playwright
+playwright-stealth
+python-dotenv
+2captcha-python

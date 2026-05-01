@@ -1,0 +1,29 @@
+{
+  "saved_at": 1777492219.0807154,
+  "cookies": [
+    {
+      "name": "aws-waf-token",
+      "value": "2ee72cbd-4855-4bf7-a5e4-276728e47437:FgoAqg+KYr0GAAAA:Ctay3UsVUz2/yXvozW1AhU1D0PN7h/3ZL7YTSuQqDFNK+WDPQYrRMR/ZDdLAaZ4RHIVmiaRtkrHj1nkiRZKT8pWEEBJY8SfCMpAvsLc6wgDqYkCzA9GLkzag3sFTqPXmHXeurMUCWvUscedb4px0If9fNtv8f4qFjP/aU+5j8kup5XI7apDT97WUQrIXWGD2KIamf1NQBKdPGKM8KXR6nFb/2YGJNj7AXnQ1XEXJsduifgREMjYk5leJSQYtzuowqd6vbeicWNiyc+zSXJC5",
+      "domain": ".tylertech.cloud",
+      "path": "/"
+    },
+    {
+      "name": "ASP.NET_SessionId",
+      "value": "thqkogbfrqqmckjx4sbtrxps",
+      "domain": "portal-nc.tylertech.cloud",
+      "path": "/"
+    },
+    {
+      "name": "AWSALB",
+      "value": "sO5Ep2DBlKUQgVrbu5lbti4BYJQTEW0TRYpNBOFZVNBS0MDeXcXu+zmqOwtXlC1xjCIAbTgdOBZZ1pTrRyU4dBLHV0sUgIW6JGLg65lwtN+N7CV5F7liIKoQ3VUB",
+      "domain": "portal-nc.tylertech.cloud",
+      "path": "/"
+    },
+    {
+      "name": "AWSALBCORS",
+      "value": "sO5Ep2DBlKUQgVrbu5lbti4BYJQTEW0TRYpNBOFZVNBS0MDeXcXu+zmqOwtXlC1xjCIAbTgdOBZZ1pTrRyU4dBLHV0sUgIW6JGLg65lwtN+N7CV5F7liIKoQ3VUB",
+      "domain": "portal-nc.tylertech.cloud",
+      "path": "/"
+    }
+  ]
+}
