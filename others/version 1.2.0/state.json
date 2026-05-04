@@ -1,0 +1,1314 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/county/mecklenburg/deeds",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1600,
+          832
+        ],
+        "id": "b43dde35-910d-490e-b961-e543e63bec17",
+        "name": "Mecklenburg Deeds"
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "scout",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "330d5e17-3d37-48cb-af1d-623f3adcb76d",
+        "name": "HeirMatrix",
+        "webhookId": "3743445f-5ce7-4852-af2a-fca6cb11ec83"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Search Wake County property assessor by parcel ID, owner name, or address. Use this tool when county is \"wake\" and you need property details, legal description, last transfer date, and book/page of the last recorded deed. Search by parcel ID first, fall back to owner name or address if parcel returns nothing.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/county/wake/assessor",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "search_type",
+                "value": "={{ $fromAI('search_type', 'Search mode: id (parcel ID), owner (last name), address (street name), pin') }}"
+              },
+              {
+                "name": "real_estate_id",
+                "value": "={{ $fromAI('real_estate_id', 'Parcel or real estate ID, used when search_type is id') }}"
+              },
+              {
+                "name": "last_name",
+                "value": "={{ $fromAI('last_name', 'Owner last name, used when search_type is owner') }}"
+              },
+              {
+                "name": "first_name",
+                "value": "={{ $fromAI('first_name', 'Owner first name, used when search_type is owner') }}"
+              },
+              {
+                "name": "street_name",
+                "value": "={{ $fromAI('street_name', 'Street name, used when search_type is address') }}"
+              },
+              {
+                "name": "street_number",
+                "value": "={{ $fromAI('street_number', 'Street number, used when search_type is address') }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          768,
+          320
+        ],
+        "id": "e3b3b8ce-7cc1-4d6a-b317-32cd89e7aa83",
+        "name": "Wake Assessor"
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $input.first().json.output;\n\n// Strip markdown code blocks if present\nconst cleaned = raw\n  .replace(/```json\\n?/g, '')\n  .replace(/```\\n?/g, '')\n  .trim();\n\n// Find the JSON object\nconst start = cleaned.indexOf('{');\nconst end = cleaned.lastIndexOf('}');\nconst jsonStr = cleaned.slice(start, end + 1);\n\nreturn [{ json: JSON.parse(jsonStr) }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          528,
+          0
+        ],
+        "id": "be4b0052-4f7f-4fd0-95b2-a248f95c270f",
+        "name": "Code in JavaScript"
+      },
+      {
+        "parameters": {
+          "content": "## WAKE COUNTY",
+          "height": 240,
+          "width": 368
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          624,
+          240
+        ],
+        "typeVersion": 1,
+        "id": "7801e6c4-a701-4211-b65c-5499e08ad925",
+        "name": "Sticky Note"
+      },
+      {
+        "parameters": {
+          "content": "## BUNCOMBE COUNTY",
+          "height": 240,
+          "width": 368
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1472,
+          496
+        ],
+        "typeVersion": 1,
+        "id": "19374cbf-a584-4ab6-9886-36a7021f8750",
+        "name": "Sticky Note1"
+      },
+      {
+        "parameters": {
+          "content": "## MECKLENBURG COUNTY",
+          "height": 240,
+          "width": 368
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1472,
+          752
+        ],
+        "typeVersion": 1,
+        "id": "be396d9e-a1de-44d0-95bd-43b0b2ddb2d9",
+        "name": "Sticky Note2"
+      },
+      {
+        "parameters": {
+          "content": "## COURT RECORDS",
+          "height": 240,
+          "width": 672,
+          "color": 6
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1872,
+          240
+        ],
+        "typeVersion": 1,
+        "id": "23fcfd1e-edf8-4f8e-a8ce-5d330c5ecd96",
+        "name": "Sticky Note3"
+      },
+      {
+        "parameters": {
+          "content": "## SCOUT AGENT",
+          "height": 1344,
+          "width": 1072,
+          "color": "#ECF5E5"
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -48,
+          -112
+        ],
+        "typeVersion": 1,
+        "id": "f63d0a05-2cac-4ee6-948d-160c86e988e1",
+        "name": "Sticky Note4"
+      },
+      {
+        "parameters": {
+          "content": "## WRITE DATABASE",
+          "height": 240,
+          "width": 256,
+          "color": 2
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          736,
+          -64
+        ],
+        "typeVersion": 1,
+        "id": "df5e7719-fabd-4c5a-afa7-02cc120e6a60",
+        "name": "Sticky Note5"
+      },
+      {
+        "parameters": {
+          "content": "## INVESTIGATOR AGENT",
+          "height": 1344,
+          "width": 1536,
+          "color": "#ECF5E5"
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1056,
+          -112
+        ],
+        "typeVersion": 1,
+        "id": "ac3be3c3-adb7-4be8-afa5-f50d421ffb16",
+        "name": "Sticky Note6"
+      },
+      {
+        "parameters": {
+          "content": "## WAKE COUNTY",
+          "height": 240,
+          "width": 368
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1472,
+          240
+        ],
+        "typeVersion": 1,
+        "id": "77e20031-77ec-4b93-b961-1e97cd2757b0",
+        "name": "Sticky Note7"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/scout/write",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          816,
+          0
+        ],
+        "id": "474743d9-cb0c-4832-bb6a-532ceded6539",
+        "name": "HTTP Request"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/county/buncombe/deeds",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1600,
+          576
+        ],
+        "id": "bc64796e-4254-45a6-947e-61e4b97c722d",
+        "name": "Buncombe Deeds"
+      },
+      {
+        "parameters": {
+          "content": "## BUNCOMBE COUNTY",
+          "height": 240,
+          "width": 368
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          624,
+          496
+        ],
+        "typeVersion": 1,
+        "id": "56c60c51-a64a-47f7-9d23-8bc9150ba942",
+        "name": "Sticky Note8"
+      },
+      {
+        "parameters": {
+          "content": "## MECKLENBURG COUNTY",
+          "height": 240,
+          "width": 368
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          624,
+          752
+        ],
+        "typeVersion": 1,
+        "id": "8794dca8-3753-424d-9c43-19cfb8fd7d7d",
+        "name": "Sticky Note9"
+      },
+      {
+        "parameters": {
+          "content": "## CAPTURE",
+          "height": 240,
+          "width": 400,
+          "color": "#FFDAD1"
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1872,
+          496
+        ],
+        "typeVersion": 1,
+        "id": "5760d1e2-be77-47df-9cae-856101307ef3",
+        "name": "Sticky Note10"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Call this first at the start of every investigation. Returns the property details, all appraiser transfer history rows, all prior document extractions, and the investigation session. Required: property_id (integer).",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/property-state",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2384,
+          576
+        ],
+        "id": "1c9d7495-bac6-4e13-b9c4-c963bbd42573",
+        "name": "Load Property State"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Search NC Clerk of Superior Court by party name. Use for Phase D estate path when current owner is deceased and no deed exists. Required: name (full name or last name). Optional: county.                                                                                            ",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/court/nc/search",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "name",
+                "value": "={{ $fromAI('name', 'Full name or last name to search, e.g. HAYES or HAYES, LYDIA') }}"
+              },
+              {
+                "name": "county",
+                "value": "={{ $fromAI('county', 'County name to filter results, leave empty for statewide search') }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1952,
+          320
+        ],
+        "id": "662d1b0d-631a-468c-b9b5-6d4fe158d681",
+        "name": "Court Search"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Get all events for a specific court case and returns the foreclosure stage. Call after court search when you need to inspect a case in detail. Required: case_url (from the search results).",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/court/nc/register_of_actions",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2160,
+          320
+        ],
+        "id": "6bfd73de-caf1-43ba-9695-8fe999394f32",
+        "name": "Register of Actions"
+      },
+      {
+        "parameters": {
+          "content": "## READ DATABASE",
+          "height": 240,
+          "width": 256,
+          "color": 2
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          2288,
+          496
+        ],
+        "typeVersion": 1,
+        "id": "9cfa3002-83fc-411e-a7f5-baeb9e4c66fe",
+        "name": "Sticky Note11"
+      },
+      {
+        "parameters": {
+          "content": "## BRAIN",
+          "height": 752,
+          "width": 288,
+          "color": 2
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          304,
+          240
+        ],
+        "typeVersion": 1,
+        "id": "a84ad7cc-85b5-4bae-91bd-9911388b3abc",
+        "name": "Sticky Note12"
+      },
+      {
+        "parameters": {
+          "content": "## BRAIN",
+          "height": 752,
+          "width": 288,
+          "color": 2
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1136,
+          240
+        ],
+        "typeVersion": 1,
+        "id": "72c064be-2b5a-4cd6-ad4f-d7318bd5b5d3",
+        "name": "Sticky Note13"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Runs Claude extraction on a saved PDF capture. Call this after save-capture with the returned capture_id. Returns structured deed fields: grantor, grantee, document type, vesting language, legal description, flags. Required: capture_id, capture_table (rod_captures or court_captures), parcel_reference (object with parcel_id and county).",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/read-document",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1952,
+          576
+        ],
+        "id": "caea04e3-d4ea-4082-a164-ba1fe4cd724f",
+        "name": "Read Document"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Saves a court case to the database. Call this after court search when you want to permanently record a case for this property. Required: property_id, case_url. Optional: court_case_number, document_type, case_data (the full case object from search results).",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/court-pull",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2384,
+          320
+        ],
+        "id": "6f129cac-f298-4bd2-8f5c-b9f1b7d6431d",
+        "name": "Court Pull"
+      },
+      {
+        "parameters": {
+          "content": "## WRITE DATABASE\n",
+          "height": 416,
+          "width": 672,
+          "color": "#FFDAD1"
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1872,
+          768
+        ],
+        "typeVersion": 1,
+        "id": "5fda0199-37ad-4e15-b4f9-bb5699c69d41",
+        "name": "Sticky Note14"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Marks an appraiser transfer history row as verified, verified_with_discrepancy, or not_findable after you have attempted to find and read the deed. Call this for every transfer row in Phase A. Required: transfer_id, verification_status. Optional: verification_notes.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/update-appraiser-verification",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1968,
+          848
+        ],
+        "id": "56bb8ae8-45e8-49c3-b6a9-da816b2cd43f",
+        "name": "Update Appraiser Verification"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Records a non-chain document found during investigation such as a mortgage, deed of trust, lien, release, or lis pendens. Required: property_id, extraction_id, record_type, summary.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/log-incidental",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2176,
+          848
+        ],
+        "id": "941d2fd4-2958-4aa1-a158-e29f126a446e",
+        "name": "Log Incidental"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Records an unresolved question you are actively investigating. Call when you encounter a gap or discrepancy you cannot immediately answer. Required: session_id, question.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/open-question",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2400,
+          848
+        ],
+        "id": "d4531356-6d09-4cc4-9d10-aac8d7655376",
+        "name": "Open Question"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Closes an open question. Call once you have an answer or have exhausted all avenues. Required: question_id, resolution (resolved / unresolved_flagged / abandoned). Optional: resolution_notes, actions_taken (list).",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/resolve-question",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1968,
+          1024
+        ],
+        "id": "6e5f8f43-09f9-43e5-9fef-414cc240a84a",
+        "name": "Resolve Question"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Marks the investigation as complete and settled. Call only when the full chain of title is verified and clean with no open questions. Required: session_id. Optional: stop_reason.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/settle-chain",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2176,
+          1024
+        ],
+        "id": "264db196-5459-4596-bef6-0eee3f9d4618",
+        "name": "Settle Chain"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Marks the investigation as flagged for human review. Call when you encounter something you cannot resolve — missing deeds, conflicting ownership, probate without a deed of distribution, or any serious title defect. Required: session_id. Optional: stop_reason.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/flag-review",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2400,
+          1024
+        ],
+        "id": "1d061162-2328-42f9-9d58-cf2ec02c9d7f",
+        "name": "Flag Review"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Pull a deed from the county Register of Deeds by book and page. Internally searches, downloads the PDF, and saves it to the database. The agent never handles PDF bytes. Returns capture_id, doc_id, grantor, grantee, recording_date, and doc_type.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/investigate/pull-deed",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          2128,
+          576
+        ],
+        "id": "a7295821-4886-44b5-9658-7d53f0153baa",
+        "name": "Pull Deed"
+      },
+      {
+        "parameters": {
+          "toolDescription": "Search Wake County Register of Deeds by name or document number. Use this for Phase B and C name searches — NOT for pulling a deed by book/page (use Pull Deed for that).\n\n  For name search:\n  { \"search_type\": \"name\", \"surname\": \"HAYES\", \"first_name\": \"LYDIA\", \"role\": \"grantee\" }\n  role options: grantor | grantee | both\n\n  For document number search:\n  { \"search_type\": \"document\", \"document_number\": \"004714-00624\" }\n\n  Returns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n  After getting results, pass book and page to Pull Deed to download and save the deed.",
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/county/wake/deeds",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $fromAI(\"body\") }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.4,
+        "position": [
+          1584,
+          320
+        ],
+        "id": "75548e7a-0f57-4cbe-ad6a-ebb68c78af22",
+        "name": "Wake Deeds"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "gpt-5",
+            "mode": "list",
+            "cachedResultName": "gpt-5"
+          },
+          "builtInTools": {},
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+        "typeVersion": 1.3,
+        "position": [
+          400,
+          720
+        ],
+        "id": "6bfcf6e6-adce-4d0e-8f57-7b4dfec95412",
+        "name": "GPT",
+        "credentials": {
+          "openAiApi": {
+            "id": "EmOJQUYtxTbgAwVZ",
+            "name": "OpenAI account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "gpt-5",
+            "mode": "list",
+            "cachedResultName": "gpt-5"
+          },
+          "builtInTools": {},
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+        "typeVersion": 1.3,
+        "position": [
+          1232,
+          704
+        ],
+        "id": "7f0bebc9-1f54-451f-9bb1-468368018964",
+        "name": "GPT1",
+        "credentials": {
+          "openAiApi": {
+            "id": "EmOJQUYtxTbgAwVZ",
+            "name": "OpenAI account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "content": "## CONCLUDE AGENT",
+          "height": 528,
+          "width": 1136,
+          "color": "#ECF5E5"
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          2624,
+          -112
+        ],
+        "typeVersion": 1,
+        "id": "2d43e06a-4ff0-4679-86e1-18a0837ccf31",
+        "name": "Sticky Note15"
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $input.first().json.output;\n\n// Strip markdown code blocks if present\nconst cleaned = raw\n  .replace(/```json\\n?/g, '')\n  .replace(/```\\n?/g, '')\n  .trim();\n\n// Find the JSON object\nconst start = cleaned.indexOf('{');\nconst end = cleaned.lastIndexOf('}');\nconst jsonStr = cleaned.slice(start, end + 1);\n\nreturn [{ json: {\n  property_id: $('Read Database').first().json.property.id,\n  ...JSON.parse(jsonStr)\n}}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3328,
+          0
+        ],
+        "id": "e4acd426-ad13-48fc-8559-612466187d17",
+        "name": "Code in JavaScript2"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          4832,
+          0
+        ],
+        "id": "3dd9b7da-fc2a-4da2-a1f1-802286224348",
+        "name": "Respond to Webhook"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/conclude/write",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          3536,
+          0
+        ],
+        "id": "70d69d3d-9f46-441a-a7ac-ab3984a09e7e",
+        "name": "Write Database"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/conclude/data",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "property_id",
+                "value": "={{ $('HTTP Request').item.json.property_id }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          2768,
+          0
+        ],
+        "id": "fe697f98-26ae-47c1-aa3f-057806abf024",
+        "name": "Read Database"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-opus-4-7",
+            "mode": "list",
+            "cachedResultName": "Claude Opus 4.7"
+          },
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          2896,
+          240
+        ],
+        "id": "4514cb78-ddcb-4ecc-87ff-14aa71b7f24f",
+        "name": "Anthropic Chat Model",
+        "credentials": {
+          "anthropicApi": {
+            "id": "iEqUI506MB7qRwlH",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.body }}",
+          "options": {
+            "systemMessage": "You are extracting structured property data from a county property appraiser page. You are given the raw text or HTML content of one parcel's appraiser record.\n \nReturn ONLY a JSON object matching this exact structure. No markdown. No code fences. No prose before or after.\n \n{\n  \"parcel_id\": \"\",\n  \"secondary_parcel_id\": null,\n  \"property_address\": {\"street\": null, \"city\": null, \"state\": null, \"zip\": null},\n  \"county\": \"\",\n  \"current_owners\": [\n    {\"raw_name\": \"\", \"owner_order\": 1}\n  ],\n  \"short_legal_raw\": null,\n  \"short_legal_parsed\": {\"subdivision\": null, \"block\": null, \"lot\": null},\n  \"plat_book\": null,\n  \"plat_page\": null,\n  \"full_legal_description\": null,\n  \"last_sale_date\": null,\n  \"transfer_history\": [\n    {\n      \"book\": null,\n      \"page\": null,\n      \"instrument_number\": null,\n      \"recorded_date\": null,\n      \"grantor_raw\": null,\n      \"grantee_raw\": null,\n      \"short_legal_raw\": null\n    }\n  ],\n  \"extraction_notes\": []\n}\n \nRULES:\n- Preserve owner names exactly as shown. Do not normalize capitalization or punctuation.\n- If a field is not present in the source, use null.\n- transfer_history may be an empty array if no prior transfers are shown.\n- short_legal_parsed: only populate a sub-field if you can identify it with high confidence from the short_legal_raw text.\n  Example: \"Lot 19 Block 7 Country Club Estates\" → {\"subdivision\": \"Country Club Estates\", \"block\": \"7\", \"lot\": \"19\"}\n- Do not invent data. When uncertain, leave null and add a note to extraction_notes describing what was unclear.\n- Do not interpret or correct names. \"Hayes, Lydia heirs\" stays as \"Hayes, Lydia heirs\"."
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          192,
+          0
+        ],
+        "id": "2b4d31b3-ed3e-4b8c-afde-0c4b1020164f",
+        "name": "Scout"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "=Begin investigation for property_id: {{ $json.property_id }}",
+          "options": {
+            "systemMessage": "You are the Chain-of-Title Investigator for a North Carolina property.\n\nGOAL: Establish how the current owner acquired this property, and verify the chain back ONE hop — i.e., confirm that the grantor on the acquisition deed actually held title at the time of transfer. Stop once verified, or flag for human review if you cannot verify.                                          \n  \nTOOLS:\n  - Load Property State → get property, transfers, session\n  - Read Document → runs Claude extraction, returns extraction\n  - Court Search → search NC courts by name\n  - Register of Actions → get case events by case_url\n  - Court Pull → saves court case to DB\n  - Update Appraiser Verification → mark transfer verified/not_findable\n  - Log Incidental → record mortgage/lien found along the way\n  - Open Question → log unresolved gap\n  - Resolve Question → close a question\n  - Wake Deeds Search → search Wake County deeds by name or document number. Returns book/page refs. (Phase B, C only)\n  - Pull Deed → pulls deed by book/page for any county, saves to DB, returns capture_id (Phase A, B, C, E)\n  - Settle Chain → end investigation as complete\n  - Flag Review → end investigation as flagged\n\n  PHASES (run in order; loop back if new findings require it):\n\n  PHASE A — Verify appraiser transfer history.\n  For each appraiser_transfer_history row (verification_status = \"pending\"):\n    1. Call Pull Deed\n       { \"property_id\": <property_id>, \"county\": <property.county>, \"book\": <transfer.book>, \"page\": <transfer.page> }\n       → Returns capture_id, grantor, grantee, recording_date, doc_type\n       If 501 returned: county not yet supported — set verification_status to not_findable, move to next row.\n       If 404 returned: deed not found at that location — set verification_status to not_findable.\n    2. Call Read Document\n       { \"capture_id\": <capture_id>, \"capture_table\": \"rod_captures\", \"parcel_reference\": { \"parcel_id\": <property.parcel_id>, \"county\": <property.county> \n  } }\n       → Returns extraction_id and structured fields\n    3. Compare extracted grantor, grantee, date, legal_match_to_parcel against the appraiser's claim.\n    4. Call Update Appraiser Verification\n       - \"verified\" if all fields match\n       - \"verified_with_discrepancy\" if deed exists but fields differ\n       - \"not_findable\" if deed not found\n\n\n  PHASE B — Independent ROD search.\n  Use the appropriate county search tool based on property.county.\n  Currently implemented: Wake County → use Wake Deeds Search.\n  If county has no search tool yet, skip Phase B and proceed to Phase C.\n\n  If property.county = \"wake\": use Wake Deeds Search.\n  Otherwise: no search tool available for this county — skip to Phase C.\n\n  1. Call Wake Deeds Search: { \"search_type\": \"name\", \"surname\": <owner_surname>, \"first_name\": <owner_first>, \"role\": \"grantee\" }\n     For every result not already captured: call Pull Deed (book, page, county, property_id) → Read Document.\n     (Only call Wake Deeds Search if property.county = \"wake\". If no search tool for this county, skip Phase B entirely and proceed to Phase C.)\n  2. Repeat with role: \"grantor\".\n  3. Mark any corrective/quitclaim/confirmation deed — these are signals for Phase C.\n\n\n  PHASE C — Chain-back verification (one hop).\n  1. Identify the acquisition deed — the most recent deed where current owner is grantee, with legal_match_to_parcel = \"high\" or \"medium\". Call this       \n  \"primary.\"\n  2. If no such deed exists, jump to Phase D.\n  3. Take primary's grantor(s). For each grantor:\n     a. Call Wake Deeds Search: { \"search_type\": \"name\", \"surname\": <grantor_surname>, \"first_name\": <grantor_first>, \"role\": \"grantee\" }\n        (Only if property.county = \"wake\". Otherwise skip to step 3e.)\n     b. For each result: call Pull Deed (book, page, county, property_id) → Read Document.\n     c. Look for a deed where grantor received this property (legal_match_to_parcel ≥ medium).\n     d. If found AND doc_type is a normal conveyance (warranty_deed, deed_of_distribution, etc.) → link verified. Call Settle Chain with session_id and    \n  stop_reason summarizing what was verified.\n\nEXCEPTION — If the found deed is a corrective_deed, quitclaim, or confirmation deed:\nThese deeds are NEVER the end of a chain. They fix or clarify a prior conveyance — they do not originate one. You must find the original deed that this corrective deed refers back to.\n        i.   Note the corrective deed's grantor (the person who conveyed in the corrective deed).\n        ii.  Search for that grantor as grantee to find the original deed they received for this parcel.\n        iii. Call Wake Deeds Search: { \"search_type\": \"name\", \"surname\": <corrective_grantor_surname>, \"first_name\": <corrective_grantor_first>, \"role\":   \n  \"grantee\" }\n        iv.  For each result: call Pull Deed → Read Document.\n        v.   Look for the original deed where the corrective grantor first received this parcel (legal_match_to_parcel ≥ medium).\n        vi.  Once found, the verified chain is: [original grantor] → [corrective grantor] → (corrective deed) → [acquisition grantor] → [current owner].   \n  Call Settle Chain summarizing the full corrective chain.\n        vii. If the original deed is not found after 5 attempts → Call Open Question describing the gap, then Call Flag Review with stop_reason\n  \"corrective_deed_original_not_found\".\n\n     e. If NOT found → try name variants (see Name Variants section). Budget: 5 attempts.\n     f. If primary references a prior deed (references_prior_deed_book/page populated) → Call Pull Deed → Read Document on that reference. Confirm whether \n  it is the grantor's grantee deed for this parcel.\n     g. If still unresolved → Call Open Question describing the gap, and consider going one more hop back (max depth = 3 hops).\n\n\n  PHASE D — Estate path.\n  Trigger if: no acquisition deed exists for current owner as grantee, OR primary is a deed_of_distribution type, OR chain terminates in a deceased owner  \n  with no subsequent deed.\n  1. Call Court Search with deceased owner's name.\n  2. Call Court Pull → Read Document on the estate file, order of distribution, and deed of distribution if any exist.\n  3. If acquisition path is established through court records → Call Settle Chain with session_id and stop_reason summarizing the estate path.\n  4. If estate records don't resolve → Call Flag Review with session_id and stop_reason: \"estate_path_unresolved\".\n\n\n  PHASE E — Incidental gathering (runs throughout B-D).\n  When name searches surface non-chain documents (deeds of trust, mortgages, releases, lis pendens, judgment liens, affidavits of death):\n  - Call Pull Deed (book, page, county, property_id) → Read Document\n  - Do not deeply analyze these or alter the chain logic based on them.\n\n\n  NAME VARIANTS (when a search doesn't find an expected record):\n  Budget: MAX 5 variant attempts per name.\n  Order:\n    1. Add or remove middle initial\n    2. Nickname substitution (Robert ↔ Bob; Joseph ↔ Joe / Joey; Catherine ↔ Kate / Cathy; William ↔ Bill; James ↔ Jim / Jimmy; Richard ↔ Dick / Rick)     \n    3. First/last name transposition\n    4. Common surname spelling variants (Stephens ↔ Stevens; Smith ↔ Smyth; double letters like Ann ↔ Anne)\n    5. Corporate suffix and prefix variants (Inc. ↔ Corp. ↔ Co. ↔ LLC; 1st ↔ First; with/without \"The\")\n  After 5 attempts without success: stop. Call Open Question describing what wasn't found. Proceed or flag based on criticality.\n\n\n  STOPPING CONDITIONS (call Flag Review with the given reason):\n  - \"chain_unresolved_at_max_depth\" — walked 3 hops back without resolution\n  - \"name_variants_exhausted\" — couldn't find an expected record after full variant budget\n  - \"ocr_below_threshold_on_critical_document\" — a document central to the chain has extraction_confidence = \"low\"\n  - \"estate_path_unresolved\" — Phase D found nothing\n  - \"legal_description_mismatch_unresolvable\" — a central document doesn't match the parcel and no explanation found\n  - \"corrective_deed_original_not_found\" — found a corrective deed but could not locate the original deed it corrects\n  - \"time_budget_exceeded\" — 10 minutes elapsed\n\n\n  DISCIPLINE:\n  - Every finding cites the capture_id or extraction_id that supports it.\n  - The appraiser's transfer history is a hypothesis to be verified — never assumed correct.\n  - Legal descriptions are checked on every deed. A deed's name match without a legal match is not a chain link.\n  - Corrective and quitclaim deeds are NEVER the end of a chain — they are evidence of a prior conveyance. Always find the deed being corrected before     \n  settling. A clean chain requires both the original deed AND the corrective deed.\n  - When uncertain, flag. Do not guess.\n  - Do not skip Phase C. One-hop verification is the whole point — no verification, no settlement.\n\n  Call either Settle Chain or Flag Review exactly once to end the investigation.\n",
+            "maxIterations": 50
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          1600,
+          0
+        ],
+        "id": "809ff187-33a8-4b32-a61d-0be62610f3e3",
+        "name": "Investigator"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ JSON.stringify({\n    property_id: $json.property.id,\n    scout_data: $json.property,\n      investigation_session: {\n    status: $json.session.status,\n    stop_reason: $json.session.stop_reason,\n    current_phase: $json.session.current_phase,\n    iteration_count: $json.session.iteration_count\n  },\n    extractions: $json.extractions,\n    investigation_flags: $json.aggregated_flags\n  }) }}",
+          "options": {
+            "systemMessage": "  You produce the final chain-of-title conclusion for one North Carolina property.                                                         \n  Investigation may be settled or partially complete (flagged_for_review). Summarize what IS known, be explicit about what is NOT known, and flag every gap. Never fabricate or infer beyond the evidence.                                                                                                  \n\n  INPUTS (user message will contain):\n  {\n    \"property_id\": ...,\n    \"scout_data\": { \"current_owners\": [...], \"parcel_id\": \"\", \"county\": \"\", \"address\": \"\", ... },\n    \"investigation_session\": {\n      \"status\": \"settled | flagged_for_review\",\n      \"current_phase\": \"A | B | C | D | E | done\",\n      \"iteration_count\": 0,\n      \"stop_reason\": null | \"...\"\n    },\n    \"extractions\": [{...document_extractions rows...}],\n    \"investigation_flags\": [...]\n  }\n\n  OUTPUT — return ONLY this JSON. No markdown. No prose. No code fences.\n\n  {\n    \"current_owners\": [\n      {\n        \"normalized_name\": \"\",\n        \"raw_name\": \"\",\n        \"is_deceased\": false,\n        \"deceased_confidence\": \"confirmed | likely | unknown\",\n        \"deceased_signals\": [\n          { \"signal\": \"\", \"evidence_extraction_id\": null }\n        ]\n      }\n    ],\n    \"acquisition_type\": \"deed | inheritance_with_deed_of_distribution | inheritance_court_only | unresolved\",\n    \"acquisition_document_refs\": {\n      \"primary_document\": {\n        \"extraction_id\": null,\n        \"book\": null,\n        \"page\": null,\n        \"document_type\": null,\n        \"recorded_date\": null\n      },\n      \"chain_back_document\": {\n        \"extraction_id\": null,\n        \"book\": null,\n        \"page\": null,\n        \"recorded_date\": null\n      },\n      \"supporting_documents\": [\n        { \"extraction_id\": null, \"role\": \"corrective | estate | other\" }\n      ]\n    },\n    \"vesting\": \"sole | tenancy_by_entirety | jtwros | tenants_in_common | trust | entity | unresolved\",\n    \"vesting_evidence\": {\n      \"extraction_id\": null,\n      \"exact_language\": null\n    },\n    \"legal_description_confidence\": \"high | medium | low\",\n    \"flags\": []\n  }\n\n\n  STEP 1 — IDENTIFY CURRENT OWNERS\n\n  Names come from scout_data.current_owners. Normalize: convert \"LAST, FIRST\" format to\n  \"FIRST LAST\". Preserve entity names as-is.\n\n  DECEASED DETECTION — check in this order, stop when confirmed:\n\n  1. Raw name contains \"(+)\", ends with \"HEIRS\", contains \"/EST\", or contains\n     \"EST OF\" → confirmed. Signal: describe the name pattern. evidence_extraction_id: null\n     (signal is from scout data, not a document).\n\n  2. Scan every extraction's grantor_names, grantee_names, and summary fields for the\n     owner's name. If the owner appears alongside \"widow\", \"widower\", \"deceased\",\n     \"estate of\", \"heirs of\", or \"heir\" in any extraction → confirmed. Cite that\n     extraction_id as evidence_extraction_id.\n\n  3. If the owner's most recent appearance in any extraction is more than 20 years before\n     today → likely. Use that extraction's recorded_date as the basis. Signal: \"last\n     recorded activity was [date], over 20 years ago.\"\n\n  4. Otherwise → unknown.\n\n  List ALL signals found. Do not stop at the first one.\n\n\n  STEP 2 — SEPARATE CHAIN DOCUMENTS FROM INCIDENTALS\n\n  Not all extractions are chain documents. Classify each before using any:\n\n  CHAIN documents — include in acquisition_document_refs:\n  - document_type is: warranty_deed, quitclaim, corrective_deed,\n    deed_of_distribution, estate_order, affidavit_of_death\n\n  INCIDENTAL documents — exclude from acquisition_document_refs and\n  supporting_documents entirely:\n  - document_type is: deed_of_trust, mortgage, release, lis_pendens,\n    judgment_lien, other\n  - These are financial instruments, not ownership transfers. Including them\n    in the chain is wrong.\n\n\n  STEP 3 — IDENTIFY THE ACQUISITION PATH\n\n  PRIMARY DOCUMENT: the chain document where the current owner appears as\n  grantee AND legal_match_to_parcel is \"high\" or \"medium\". If multiple qualify,\n  use the most recent by recorded_date. If none qualify at high/medium, use the\n  best low-match candidate and add flag \"primary_acquisition_low_legal_match\".\n\n  CHAIN-BACK DOCUMENT: the chain document where the primary deed's grantor\n  appears as grantee, with a recorded_date BEFORE the primary deed's recorded_date.\n  If not found among the extractions, set all fields to null and add flag\n  \"chain_back_not_found\".\n\n  SUPPORTING DOCUMENTS (include only chain documents, never incidentals):\n  - Corrective deeds or quitclaims that clarify or resolve a chain issue → \"corrective\"\n  - Estate records, deeds of distribution, court orders → \"estate\"\n  - Any other chain document that contextualizes the primary or chain-back → \"other\"\n\n  CORRECTIVE DEED HANDLING: if a corrective deed or quitclaim appears, identify\n  what it corrects. The deed it references (usually via references_prior_deed_book/page)\n  should be listed as role \"other\" if captured, so the reviewer understands the\n  relationship. Add flag \"corrective_deed_in_chain\".\n\n  ACQUISITION TYPE:\n  - deed: primary document is a warranty_deed or quitclaim\n  - inheritance_with_deed_of_distribution: primary is a deed_of_distribution\n  - inheritance_court_only: acquisition established only through estate_order or\n    court records with no recorded deed of distribution\n  - unresolved: no primary document found with any legal_match confidence\n\n\n  STEP 4 — VESTING (North Carolina rules)\n\n  Determine vesting from the primary document's vesting_language and grantee_names.\n\n  - sole: exactly one grantee named in the primary document.\n    vesting_evidence.exact_language = \"single grantee: [name as written]\"\n\n  - tenancy_by_entirety: exactly two grantees AND vesting_language contains\n    \"husband and wife\" or \"married\". Both grantees must be named individuals.\n\n  - jtwros: two or more grantees AND vesting_language contains explicit phrase\n    \"joint tenants with right of survivorship\" or \"with right of survivorship\".\n    Absent this exact language, default to tenants_in_common — do not infer jtwros.\n\n  - tenants_in_common: two or more grantees with no survivorship or entirety\n    language. NC statutory default.\n\n  - trust: grantee is a named trust or a trustee acting on behalf of a named trust.\n\n  - entity: grantee is an LLC, corporation, partnership, or other legal entity.\n\n  - unresolved: primary document not found, or vesting_language is too ambiguous\n    to classify. Add flag \"vesting_unresolved_no_evidence\".\n\n  vesting_evidence.extraction_id = the extraction whose vesting_language\n  established the vesting type.\n  vesting_evidence.exact_language = verbatim phrase from that extraction.\n\n\n  STEP 5 — LEGAL DESCRIPTION CONFIDENCE\n\n  Compute from CHAIN documents only (primary + chain-back). Ignore incidentals.\n\n  - high: primary AND chain-back both have legal_match_to_parcel = \"high\"\n  - medium: at least one is \"medium\", none are \"low\" or \"none\"\n  - low: any chain document is \"low\" or \"none\", OR primary has flag\n    \"legal_description_mismatch\", OR chain-back is null\n\n\n  STEP 6 — INVESTIGATION COMPLETENESS CHECK\n\n  If investigation_session.status = \"flagged_for_review\":\n    Add flag \"investigation_incomplete\".\n\n  If investigation_session.current_phase is \"A\" or \"B\" (investigation stopped\n  before Phase C chain-back verification):\n    Add flag \"phases_bc_not_completed\". This means the chain-back null is not\n    proof the deed doesn't exist — it was never searched.\n\n  If investigation_session.iteration_count = 0:\n    Add flag \"investigation_incomplete\" (if not already present).\n\n\n  STEP 7 — FLAGS\n\n  Carry forward ALL flags from investigation_flags without modification.\n  Additionally add each that applies:\n\n  - \"investigation_incomplete\" — session did not reach settled status\n  - \"phases_bc_not_completed\" — stopped before Phase C; add this if\n    investigation_session.current_phase is \"A\" or \"B\"\n  - Add investigation_session.stop_reason as a flag verbatim if it is not null\n    (e.g. stop_reason \"estate_path_unresolved\" → add flag \"estate_path_unresolved\")  - \"chain_back_not_found\" — acquisition_type is \"deed\" but chain_back_document is null\n  - \"primary_acquisition_low_legal_match\" — primary deed has legal_match = \"low\"\n  - \"corrective_deed_in_chain\" — a corrective or quitclaim deed affects the chain\n  - \"vesting_unresolved_no_evidence\" — vesting could not be determined\n  - \"acquisition_unresolved\" — acquisition_type is \"unresolved\"\n  - \"legal_description_low_confidence\" — legal_description_confidence is \"low\"\n  - \"deceased_status_inferred_only\" — deceased_confidence is \"likely\" (not confirmed)\n\n\n  DISCIPLINE:\n  - Every extraction_id cited must exist in the provided extractions array.\n  - Never include incidental records in supporting_documents.\n  - chain_back_document must predate primary_document. If a candidate is dated\n    after the primary, it is not a valid chain-back — leave chain_back null.\n  - When uncertain, set the field to null/unresolved and add a flag. Do not guess.\n  - All investigation_flags must be preserved. Never drop one."
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          3008,
+          0
+        ],
+        "id": "ed89fa93-735d-469e-9560-ae8123bbbd49",
+        "name": "Conclude"
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $input.first().json.output;\nconst cleaned = raw.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\nconst start = cleaned.indexOf('{');\nconst end = cleaned.lastIndexOf('}');\nconst parsed = JSON.parse(cleaned.slice(start, end + 1));\n\nreturn [{ json: {\n  conclusion_id: $('Read Database1').first().json.conclusion.id,\n  verdict: parsed.verdict,\n  objections: parsed.objections,\n  reviewer_notes: parsed.reviewer_notes\n}}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          4384,
+          0
+        ],
+        "id": "bbaf1e2b-2f7b-4103-9450-26a1ca193e56",
+        "name": "Code in JavaScript3"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/verify/write",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          4592,
+          0
+        ],
+        "id": "4f508346-6b3f-4288-9b2c-7ad35c366847",
+        "name": "Write Database1"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8000/verify/data",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "conclusion_id",
+                "value": "={{ $json.conclusion_id }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          3872,
+          0
+        ],
+        "id": "7b03bc9a-4ebf-4550-aec9-20561608400d",
+        "name": "Read Database1"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-opus-4-7",
+            "mode": "list",
+            "cachedResultName": "Claude Opus 4.7"
+          },
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          3952,
+          240
+        ],
+        "id": "f061bbaa-8a7d-4b07-af74-138740409fb7",
+        "name": "Anthropic Chat Model1",
+        "credentials": {
+          "anthropicApi": {
+            "id": "iEqUI506MB7qRwlH",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "content": "## VERIFY AGENT",
+          "height": 528,
+          "width": 1232,
+          "color": "#ECF5E5"
+        },
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          3792,
+          -112
+        ],
+        "typeVersion": 1,
+        "id": "c7e4ee8d-3adf-4b15-ac0f-bf477594dba3",
+        "name": "Sticky Note16"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ JSON.stringify({conclusion: $json.conclusion, referenced_extractions: $json.referenced_extractions }) }}",
+          "options": {
+            "systemMessage": "  You are an adversarial reviewer of a chain-of-title conclusion for a North Carolina                                                        property. Your job is to challenge every claim in the conclusion against the document                                                    \n  evidence and catch errors.                                                                                                               \n\n  YOU HAVE ACCESS TO:\n  - conclusion: the chain_conclusions row produced by the Conclude agent\n  - referenced_extractions: every document_extraction cited in the conclusion\n\n  YOU DO NOT HAVE ACCESS TO:\n  - investigation_trace\n  - Any reasoning the Conclude agent used to produce the conclusion\n\n  This is intentional. Evaluate the conclusion only against the evidence in the extractions.\n\n  INPUTS (user message will contain):\n  {\n    \"conclusion\": { ...chain_conclusions row... },\n    \"referenced_extractions\": [ ...document_extractions rows... ]\n  }\n\n  OUTPUT — return ONLY this JSON. No markdown. No prose. No code fences.\n\n  {\n    \"verdict\": \"approved | objection_raised | flagged_for_human\",\n    \"objections\": [\n      {\n        \"claim_being_challenged\": \"\",\n        \"evidence_citation\": \"extraction_id or null\",\n        \"problem\": \"\",\n        \"severity\": \"low | medium | high\",\n        \"suggested_resolution\": \"return_to_investigate | human_review\"\n      }\n    ],\n    \"reviewer_notes\": \"\"\n  }\n\n\n  BEFORE RUNNING CHECKS — READ THE FLAGS\n\n  Read conclusion.flags before running any check. These flags affect how you\n  interpret gaps:\n\n  - \"investigation_incomplete\" or \"phases_bc_not_completed\": the investigation did\n    not finish all phases. Gaps may be due to incomplete search, not wrong reasoning.\n    Gaps caused by these flags → severity \"medium\", suggested_resolution\n    \"return_to_investigate\".\n\n  - \"chain_back_not_found\": the chain-back was not found during investigation. Raise\n    a chain integrity objection but use suggested_resolution \"return_to_investigate\"\n    — the deed was not searched for, not proven absent.\n\n  - If neither investigation flag is present and chain_back is null anyway → severity\n    \"high\", suggested_resolution \"human_review\".\n\n\n  CHECKS — run all eight, in order. Raise an objection for every failure.\n\n\n  CHECK 1 — CITATION COMPLETENESS\n\n  1a. primary_document.extraction_id must be populated and must exist in\n      referenced_extractions. If null or not found: severity high.\n\n  1b. chain_back_document: if acquisition_type is \"deed\":\n      - If \"chain_back_not_found\" flag IS present: raise objection, severity medium,\n        suggested_resolution return_to_investigate.\n      - If that flag is NOT present and chain_back is null: severity high,\n        suggested_resolution human_review.\n      - If chain_back.extraction_id is populated but not found in\n        referenced_extractions: severity high.\n\n  1c. vesting_evidence.extraction_id must be populated when vesting is not\n      \"unresolved\". If null: severity medium.\n\n  1d. For each deceased_signal:\n      - Signal describes a name pattern (\"ends with HEIRS\", \"contains /EST\",\n        \"name contains heirs\"): evidence_extraction_id may be null. No objection.\n      - Signal describes a document claim (\"identified as widow in document\",\n        \"estate record confirms\"): evidence_extraction_id must be populated and\n        must exist in referenced_extractions. If null or missing: severity medium.\n\n\n  CHECK 2 — ACQUISITION MATCH\n\n  2a. The primary extraction's grantee_names must include the current owner.\n      Matching is case-insensitive and tolerates \"LAST, FIRST\" vs \"FIRST LAST\"\n      normalization and minor name variants. If no grantee reasonably matches\n      any current_owner normalized_name or raw_name: severity high.\n\n  2b. The primary extraction's legal_match_to_parcel must be \"high\" or \"medium\".\n      - If \"low\" and flag \"primary_acquisition_low_legal_match\" is already present:\n        severity medium (flagged but not suppressed).\n      - If \"low\" and that flag is absent: severity medium.\n      - If \"none\": severity high regardless of flags.\n\n\n  CHECK 3 — CHAIN INTEGRITY\n\n  Only run when acquisition_type = \"deed\".\n\n  3a. chain_back_document must be populated (handled in check 1b).\n\n  3b. If chain_back_document.extraction_id is populated:\n      - Its recorded_date must be BEFORE primary_document.recorded_date.\n        If after: severity high — a deed dated after the primary cannot be the\n        chain-back. This is a logical impossibility.\n      - Its grantee_names must include the primary document's grantor_names.\n        Case-insensitive, allow partial match. If no match: severity high.\n      - Its legal_match_to_parcel must be \"high\" or \"medium\". If \"low\" or \"none\":\n        severity medium.\n\n  3c. If a corrective deed appears in supporting_documents (role=\"corrective\"):\n      - The extraction for that corrective deed should have\n        references_prior_deed_book/page populated, pointing to the deed it corrects.\n      - If that referenced original deed is not listed anywhere in\n        supporting_documents or as the primary: severity medium — \"corrective deed\n        references an original not accounted for in conclusion.\"\n\n\n  CHECK 4 — VESTING SUPPORT\n\n  4a. vesting = \"tenancy_by_entirety\": vesting_evidence.exact_language must contain\n      \"husband and wife\", \"married\", or a clear equivalent. If absent: severity high.\n\n  4b. vesting = \"jtwros\": exact_language must contain \"right of survivorship\" or\n      \"joint tenants with right of survivorship\". Absent this exact language: severity\n      high — NC default is tenants_in_common, not jtwros.\n\n  4c. vesting = \"tenants_in_common\": primary extraction must have 2+ grantees listed\n      and no survivorship or entirety language. If only one grantee: severity high.\n\n  4d. vesting = \"sole\": primary extraction must have exactly one grantee. If 2+\n      grantees appear: severity high.\n\n  4e. vesting = \"trust\" or \"entity\": grantee_names in the primary extraction must\n      reflect a trust or legal entity. If individual person names appear instead:\n      severity high.\n\n  4f. vesting = \"unresolved\": verify that flag \"vesting_unresolved_no_evidence\" is\n      present in conclusion.flags. If absent: severity low.\n\n\n  CHECK 5 — DECEASED STATUS\n\n  5a. For each current_owner where is_deceased = true:\n      - At least one deceased_signal must be present. If none: severity high.\n      - For each signal that cites an evidence_extraction_id: verify the extraction\n        exists in referenced_extractions AND that its grantor_names, grantee_names,\n        or summary actually supports the signal claim. If text does not support\n        the signal: severity medium.\n\n  5b. For each current_owner where is_deceased = false:\n      - Scan referenced_extractions for any appearance of that owner's name alongside\n        \"widow\", \"widower\", \"deceased\", \"heirs\", \"estate of\", or \"(+)\".\n      - If such language exists and is_deceased is false: severity medium —\n        deceased status may be underreported.\n\n\n  CHECK 6 — LEGAL DESCRIPTION CONFIDENCE COHERENCE\n\n  Recompute expected confidence from chain extractions only (primary + chain_back).\n  Ignore incidental extractions.\n\n  - high: primary AND chain_back both have legal_match_to_parcel = \"high\"\n  - medium: at least one is \"medium\", none are \"low\" or \"none\"\n  - low: any chain extraction is \"low\" or \"none\", OR chain_back is null\n\n  If conclusion.legal_description_confidence is HIGHER than your computed value:\n  severity medium — conclusion is overclaiming confidence.\n  If it matches or is lower: no objection.\n\n\n  CHECK 7 — FLAG COHERENCE\n\n  7a. Any referenced chain extraction has flag \"legal_description_mismatch\" and\n      conclusion does not have \"legal_description_low_confidence\": severity low.\n\n  7b. Any referenced chain extraction has flag \"missing_critical_field\" and\n      conclusion does not carry that flag forward: severity low.\n\n  7c. Any referenced extraction has flag \"ambiguous_vesting_language\" and vesting\n      is not \"unresolved\": severity medium — vesting claim may rest on ambiguous\n      language.\n\n  7d. conclusion.flags contains \"phases_bc_not_completed\" but chain_back_document\n      is populated with a valid extraction_id: severity low — flag is inconsistent\n      with the evidence present.\n\n\n  CHECK 8 — INTERNAL CONSISTENCY\n\n  8a. acquisition_type = \"deed\" but primary_document.document_type is\n      \"deed_of_distribution\" or \"estate_order\": severity high — acquisition type\n      does not match document type.\n\n  8b. acquisition_type = \"inheritance_with_deed_of_distribution\" but no supporting\n      document has role \"estate\": severity medium — inheritance claim has no estate\n      document cited.\n\n  8c. current_owners list is empty: severity high — conclusion has no owner.\n\n  8d. conclusion.flags contains both \"investigation_incomplete\" and\n      \"phases_bc_not_completed\" but chain_back_document is populated and valid:\n      severity low — flags suggest incomplete investigation but evidence contradicts.\n\n\n  VERDICTS\n\n  \"approved\": every check passes. No objections at any severity.\n\n  \"objection_raised\": one or more checks fail with issues that returning to\n  Investigate could plausibly resolve. Examples:\n  - chain_back is null with \"investigation_incomplete\" flag present\n  - primary deed has legal_match = \"low\" but no contradicting evidence\n  - A deceased signal cites an extraction that doesn't clearly support the claim\n  - Missing flag that more analysis could add\n  Populate objections array in full.\n\n  \"flagged_for_human\": one or more checks fail with issues that automation cannot\n  resolve. Examples:\n  - Legal description on primary is \"none\" — deed may be for a different parcel\n  - Vesting language directly contradicts the claimed vesting type\n  - chain_back extraction is dated AFTER the primary deed\n  - Two extractions contradict each other on a chain-critical fact\n  - Deceased claimed with zero signals and no extraction support\n  - acquisition_type contradicts primary document_type\n  Always populate objections with the specific high-severity failure.\n\n\n  DISCIPLINE:\n  - Do not be charitable. Your job is to find errors, not confirm assumptions.\n  - Name matching is case-insensitive. \"LYDIA HAYES\" matches \"Lydia Hayes\".\n    Do not raise objections on capitalization differences alone.\n  - A missing citation on a document-based claim is always at least medium severity.\n  - Name-pattern deceased signals (HEIRS, /EST, (+)) legitimately have null\n    evidence_extraction_id. Do not object to these.\n  - \"Looks reasonable\" is not an approval rationale. Every claim must be traceable\n    to a specific extraction in the referenced_extractions array.\n  - reviewer_notes: 2-3 sentences. State the overall quality of the conclusion,\n    the most critical gap found, and what would be needed to resolve it.\n    If approved, state what was verified and why the conclusion is sound."
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          4064,
+          0
+        ],
+        "id": "6e7b66be-18ac-4250-97f1-74deb7d14684",
+        "name": "Verify"
+      }
+    ],
+    "connections": {
+      "Mecklenburg Deeds": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HeirMatrix": {
+        "main": [
+          [
+            {
+              "node": "Scout",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wake Assessor": {
+        "ai_tool": [
+          [
+            {
+              "node": "Scout",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Investigator",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buncombe Deeds": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Load Property State": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Court Search": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Register of Actions": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Document": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Court Pull": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Appraiser Verification": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Log Incidental": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Open Question": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resolve Question": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Settle Chain": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Flag Review": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pull Deed": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wake Deeds": {
+        "ai_tool": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GPT": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Scout",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GPT1": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Investigator",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript2": {
+        "main": [
+          [
+            {
+              "node": "Write Database",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write Database": {
+        "main": [
+          [
+            {
+              "node": "Read Database1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Database": {
+        "main": [
+          [
+            {
+              "node": "Conclude",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Anthropic Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Conclude",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Scout": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Investigator": {
+        "main": [
+          [
+            {
+              "node": "Read Database",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Conclude": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript3": {
+        "main": [
+          [
+            {
+              "node": "Write Database1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write Database1": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Database1": {
+        "main": [
+          [
+            {
+              "node": "Verify",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Anthropic Chat Model1": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Verify",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "6d0b8cd805b0ccd8f9a7ce01e1e8c3ab67814ea806cdb5ce9b11b019590d82b4"
+    }
+  }
