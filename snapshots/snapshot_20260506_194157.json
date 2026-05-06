@@ -1,0 +1,1142 @@
+{
+  "properties": [
+    {
+      "id": 1,
+      "parcel_id": "0060673",
+      "county": "wake",
+      "state_code": "NC",
+      "address": "530  BRAGG ST, RALEIGH, NC",
+      "scout_completed_at": "2026-05-06T10:55:09.474444",
+      "investigation_status": "pending",
+      "chain_conclusion_id": 1,
+      "created_at": "2026-05-06T10:55:09.474444",
+      "updated_at": "2026-05-06T11:12:24.345713",
+      "secondary_parcel_id": null,
+      "street": "530  BRAGG ST",
+      "city": "RALEIGH",
+      "state": "NC",
+      "zip": null,
+      "current_owners": [
+        {
+          "raw_name": "REAL PROPERTY ADMINISTRATION PARTNE",
+          "owner_order": 1
+        }
+      ],
+      "short_legal_raw": null,
+      "subdivision": null,
+      "block": null,
+      "lot": null,
+      "plat_book": null,
+      "plat_page": null,
+      "full_legal_description": null,
+      "last_sale_date": "2026-02-20",
+      "extraction_notes": [],
+      "short_legal_parsed": null
+    },
+    {
+      "id": 2,
+      "parcel_id": "0028719",
+      "county": "wake",
+      "state_code": "NC",
+      "address": "0  ANGLEVIEW DR, Fire District, NC",
+      "scout_completed_at": "2026-05-06T11:15:06.737920",
+      "investigation_status": "pending",
+      "chain_conclusion_id": 2,
+      "created_at": "2026-05-06T11:15:06.737920",
+      "updated_at": "2026-05-06T11:28:01.954526",
+      "secondary_parcel_id": null,
+      "street": "0  ANGLEVIEW DR",
+      "city": "Fire District",
+      "state": "NC",
+      "zip": null,
+      "current_owners": [
+        {
+          "raw_name": "ETHERIDGE, JOHNNY W HEIRS",
+          "owner_order": 1
+        }
+      ],
+      "short_legal_raw": null,
+      "subdivision": null,
+      "block": null,
+      "lot": null,
+      "plat_book": null,
+      "plat_page": null,
+      "full_legal_description": null,
+      "last_sale_date": "2019-12-27",
+      "extraction_notes": [
+        "The property is listed as vacant land with a zoning of RA."
+      ],
+      "short_legal_parsed": null
+    },
+    {
+      "id": 3,
+      "parcel_id": "0029590",
+      "county": "wake",
+      "state_code": "NC",
+      "address": "631 E NELSON AVE, WAKE FOREST, NC",
+      "scout_completed_at": "2026-05-06T11:30:18.005844",
+      "investigation_status": "pending",
+      "chain_conclusion_id": 4,
+      "created_at": "2026-05-06T11:30:18.005844",
+      "updated_at": "2026-05-06T11:39:18.484027",
+      "secondary_parcel_id": null,
+      "street": "631 E NELSON AVE",
+      "city": "WAKE FOREST",
+      "state": "NC",
+      "zip": null,
+      "current_owners": [
+        {
+          "raw_name": "HAYES, LYDIA HEIRS",
+          "owner_order": 1
+        }
+      ],
+      "short_legal_raw": null,
+      "subdivision": null,
+      "block": null,
+      "lot": null,
+      "plat_book": null,
+      "plat_page": null,
+      "full_legal_description": null,
+      "last_sale_date": "1997-05-13",
+      "extraction_notes": [],
+      "short_legal_parsed": null
+    }
+  ],
+  "appraiser_transfer_history": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "book": "20149",
+      "page": "1739",
+      "instrument_number": null,
+      "recorded_date": "2026-02-20",
+      "grantor_raw": null,
+      "grantee_raw": null,
+      "short_legal_raw": null,
+      "verification_status": "verified_with_discrepancy",
+      "verification_notes": "Deed found matching book/page and recording date. Appraiser record lacked grantor/grantee details; extracted grantee is 'Real Property Administration Partners LLC as Trustee...' (matches current owner name variant). Legal match: high.",
+      "verified_at": "2026-05-06T10:57:25.917148",
+      "created_at": "2026-05-06T10:55:09.474444",
+      "updated_at": "2026-05-06T10:57:25.917148"
+    },
+    {
+      "id": 2,
+      "property_id": 2,
+      "book": "-E-\u00a0\u00a0-",
+      "page": null,
+      "instrument_number": null,
+      "recorded_date": "2019-12-27",
+      "grantor_raw": null,
+      "grantee_raw": "ETHERIDGE, JOHNNY W HEIRS",
+      "short_legal_raw": null,
+      "verification_status": "not_findable",
+      "verification_notes": "no valid book/page \u2014 likely instrument-number-only recording",
+      "verified_at": "2026-05-06T11:16:19.519633",
+      "created_at": "2026-05-06T11:15:06.737920",
+      "updated_at": "2026-05-06T11:16:19.519633"
+    }
+  ],
+  "rod_captures": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOC833S1902//2026017900-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "20149",
+      "page": "1739",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmp7_uwqips.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T10:55:34.980289",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T10:55:34.980289",
+      "updated_at": "2026-05-06T10:55:51.280130"
+    },
+    {
+      "id": 2,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC106901498//000942-00081-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "942",
+      "page": "83",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpffn840xl.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T10:58:42.063346",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T10:58:42.063346",
+      "updated_at": "2026-05-06T11:00:34.191384"
+    },
+    {
+      "id": 3,
+      "property_id": 1,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC113923//002625-00155-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "002625",
+      "page": "00155",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpjb7i1xog.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:06:07.243657",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:06:07.243657",
+      "updated_at": "2026-05-06T11:06:18.932851"
+    },
+    {
+      "id": 4,
+      "property_id": 2,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC110619918//017164-02182-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "017164",
+      "page": "02182",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmp3sv8n5s3.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:16:54.067670",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:16:54.067670",
+      "updated_at": "2026-05-06T11:17:02.630816"
+    },
+    {
+      "id": 5,
+      "property_id": 2,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC105246744//008691-01965-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "008691",
+      "page": "01965",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmp7_3zfh_f.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:18:00.360456",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:18:00.360456",
+      "updated_at": "2026-05-06T11:18:10.984031"
+    },
+    {
+      "id": 6,
+      "property_id": 2,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC105680728//009524-00988-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "009524",
+      "page": "00988",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpgbo6yons.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:21:02.935401",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:21:02.935401",
+      "updated_at": "2026-05-06T11:21:12.114388"
+    },
+    {
+      "id": 7,
+      "property_id": 2,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC110508464//016957-02757-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "16957",
+      "page": "2757",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpvksv2mhy.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:22:15.005023",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:22:15.005023",
+      "updated_at": "2026-05-06T11:22:26.924050"
+    },
+    {
+      "id": 8,
+      "property_id": 3,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC106695809//001155-00171-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "001155",
+      "page": "00171",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpk0ic8vj5.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:31:17.790727",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:31:17.790727",
+      "updated_at": "2026-05-06T11:31:26.581851"
+    },
+    {
+      "id": 9,
+      "property_id": 3,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC106989884//000913-00352-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "000913",
+      "page": "00354",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmpdq5yot93.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:32:35.474446",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:32:35.474446",
+      "updated_at": "2026-05-06T11:32:44.304322"
+    },
+    {
+      "id": 10,
+      "property_id": 3,
+      "source_url": "https://rodrecords.wake.gov/web/document-image-pdf/DOCC107022581//000860-00053-1.pdf?index=1",
+      "capture_type": "document_image",
+      "book": "860",
+      "page": "53",
+      "instrument_number": null,
+      "raw_content": "C:\\Users\\ZHAZTE~1\\AppData\\Local\\Temp\\tmp6he7gev1.pdf",
+      "ocr_text": null,
+      "ocr_confidence": 0.9,
+      "captured_at": "2026-05-06T11:33:48.017675",
+      "parse_status": "extracted",
+      "parse_error": null,
+      "created_at": "2026-05-06T11:33:48.017675",
+      "updated_at": "2026-05-06T11:33:56.383797"
+    }
+  ],
+  "court_captures": [],
+  "document_extractions": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "rod_capture_id": 1,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "Eton Robinson Everett, unmarried, being an heir at law of Jacob Robinson, deceased, and being an heir at law of Doris Elaine Kilpatrick (Robinson), deceased"
+      ],
+      "grantee_names": [
+        "Real Property Administration Partners LLC as Trustee of 530 Bragg St Land Trust U/A/D 2/16/2026"
+      ],
+      "recorded_date": "2026-02-20",
+      "instrument_date": "2026-02-17",
+      "book": "020149",
+      "page": "01739",
+      "instrument_number": "2026017900",
+      "vesting_language": "as Trustee of 530 Bragg St Land Trust U/A/D 2/16/2026",
+      "legal_description_full": "Beginning at a point in the southern line of Bragg Street, said point being 100 feet east of the intersection of Mineral Springs Branch and the southern line of Bragg Street runs thence in a southern direction 205 feet to a point in Mineral Springs Branch; thence in an eastern direction with said branch 51 feet; thence in a northern direction 217.1 feet to a point in the southern line of Bragg Street; thence in a western direction along the southern line of Bragg Street 50 feet to the point of beginning, being Lot No. 3 according to map registered in the office of the Register of Deeds for Wake County, North Carolina, in Book of Maps 1928, on page 115.",
+      "legal_description_short": "Lot No. 3, Book of Maps 1928, page 115, Wake County, NC; 530 Bragg St, Raleigh, NC 27610; Parcel ID 0060673",
+      "plat_book": "1928",
+      "plat_page": "115",
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "942",
+      "references_prior_deed_page": "83",
+      "references_prior_deed_language": "Sherman Robinson and wife, Flora Robinson acquired title to this property by Warranty Deed recorded on May 8, 1946 in Book 942, Page 83 of the Wake County Public Registry.",
+      "legal_match_to_parcel": "high",
+      "legal_match_method": "metes_bounds",
+      "legal_match_notes": "Parcel ID 0060673 is explicitly stated in the Exhibit A informational section, and the metes-and-bounds description references Lot No. 3 in Book of Maps 1928, page 115, Wake County, NC, consistent with the parcel reference provided.",
+      "extraction_confidence": "high",
+      "summary": "North Carolina General Warranty Deed dated February 17, 2026, from Eton Robinson Everett (heir at law of Jacob Robinson and Doris Elaine Kilpatrick Robinson, both deceased) to Real Property Administration Partners LLC as Trustee of 530 Bragg St Land Trust U/A/D 2/16/2026, conveying Lot No. 3 at 530 Bragg St, Raleigh, NC (Parcel ID 0060673), recorded February 20, 2026 as instrument 2026017900 at Book 020149, Page 01739.",
+      "flags": [
+        "references_unretrieved_prior_deed"
+      ],
+      "created_at": "2026-05-06T10:55:51.280130",
+      "updated_at": "2026-05-06T10:55:51.280130"
+    },
+    {
+      "id": 2,
+      "property_id": 1,
+      "rod_capture_id": 2,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "Clem B. Holding and wife, Katie Lee Holding",
+        "I. O. Brady, Trustee",
+        "Durham Life Insurance Company"
+      ],
+      "grantee_names": [
+        "Marion Weldon and wife, Cora Weldon",
+        "Sherman Robinson and wife, Flora Robinson"
+      ],
+      "recorded_date": "1946-05-25",
+      "instrument_date": "1946-05-01",
+      "book": "942",
+      "page": "81",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "PARCEL 1: Being known as 420 Watson Street and more particularly described as follows: Beginning at a point on the west side of Watson Street 145 feet north of its intersection with Cabarrus Street, being the northeast corner of a lot formerly owned by Jennie Mayes and the southeast corner of the lot herein conveyed; runs west along the north line of formerly Mayes' lot 90 feet; thence north in a line parallel with Watson Street 45 feet to the south line of Lot No. 4 as shown on the plat of the Watson Lands, recorded in Book of Maps 1885, at page 25, in the office of the Register of Deeds for Wake County, North Carolina; thence east along the south line of Lot No. 4, 90 feet to the west side of Watson Street; thence south along the west side of Watson Street 45 feet to the point of beginning, and being Lot No. 5 as shown on the plat of the Watson Lands recorded in Book of Maps 1885, page 25, in the office of the Register of Deeds for Wake County, North Carolina, and being premises known as No. 420 Watson Street, Raleigh, North Carolina. For further reference see Book 595, page 402, Wake County Registry. PARCEL 2: Being known as 530 Bragg Street and more particularly described as follows: Beginning at a point in the southern line of Bragg Street, said point being 100 feet east of the intersection of Mineral Springs Branch and the southern line of Bragg Street runs thence in a southern direction 205 feet to a point in Mineral Springs Branch; thence in an eastern direction with said branch 51 feet; thence in a northern direction 217.1 feet to a point in the southern line of Bragg Street; thence in a western direction along the southern line of Bragg Street 50 feet to the point of beginning, being Lot No. 3 according to map registered in the office of the Register of Deeds for Wake County, North Carolina, in Book of Maps 1928, on page 115.",
+      "legal_description_short": "Lot No. 5, Watson Lands, Book of Maps 1885 page 25 (420 Watson Street, Raleigh, NC); and Lot No. 3, Book of Maps 1928 page 115 (530 Bragg Street, Raleigh, NC)",
+      "plat_book": "1885; 1928",
+      "plat_page": "25; 115",
+      "conveys_multiple_parcels": true,
+      "parcels_conveyed_count": 2,
+      "references_prior_deed_book": "595",
+      "references_prior_deed_page": "402",
+      "references_prior_deed_language": "For further reference see Book 595, page 402, Wake County Registry.",
+      "legal_match_to_parcel": "none",
+      "legal_match_method": "none",
+      "legal_match_notes": "No parcel_reference lot, subdivision, plat book, or plat page was provided to match against. The document conveys two distinct parcels (420 Watson Street / Lot 5 Watson Lands, and 530 Bragg Street / Lot 3 Book of Maps 1928 p.115) to two different grantees. Cannot confirm match to parcel ID 0060673 without additional reference data.",
+      "extraction_confidence": "medium",
+      "summary": "Warranty deed dated May 1, 1946, from Clem B. Holding and wife Katie Lee Holding (joined by I. O. Brady, Trustee, and Durham Life Insurance Company for release of a prior deed of trust) conveying two separate parcels in Wake County, NC: Lot 5 of the Watson Lands (420 Watson Street, Raleigh) to Marion Weldon and wife Cora Weldon, and Lot 3 per Book of Maps 1928 page 115 (530 Bragg Street) to Sherman Robinson and wife Flora Robinson; recorded May 25, 1946 in Book 942, Page 81.",
+      "flags": [
+        "multi_parcel_conveyance",
+        "references_unretrieved_prior_deed",
+        "missing_critical_field",
+        "low_ocr_readability"
+      ],
+      "created_at": "2026-05-06T10:58:50.972511",
+      "updated_at": "2026-05-06T10:58:50.972511"
+    },
+    {
+      "id": 3,
+      "property_id": 1,
+      "rod_capture_id": 2,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "Clem B. Holding and wife, Katie Lee Holding",
+        "I. O. Brady, Trustee",
+        "Durham Life Insurance Company"
+      ],
+      "grantee_names": [
+        "Marion Weldon and wife, Cora Weldon",
+        "Sherman Robinson and wife, Flora Robinson"
+      ],
+      "recorded_date": "1946-05-25",
+      "instrument_date": "1946-05-01",
+      "book": "942",
+      "page": "81",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "PARCEL 1: Being known as 420 Watson Street and more particularly described as follows: Beginning at a point on the west side of Watson Street 145 feet north of its intersection with Cabarrus Street, being the northeast corner of a lot formerly owned by Jennie Mayes and the southeast corner of the lot herein conveyed; runs west along the north line of formerly Mayes' lot 90 feet; thence north in a line parallel with Watson Street 45 feet to the south line of Lot No. 4 as shown on the plat of the Watson Lands, recorded in Book of Maps 1885, at page 25, in the office of the Register of Deeds for Wake County, North Carolina; thence east along the south line of Lot No. 4, 90 feet to the west side of Watson Street; thence south along the west side of Watson Street 45 feet to the point of beginning, and being Lot No. 5 as shown on the plat of the Watson Lands recorded in Book of Maps 1885, page 25, in the office of the Register of Deeds for Wake County, North Carolina, and being premises known as No. 420 Watson Street, Raleigh, North Carolina. For further reference see Book 595, page 402, Wake County Registry. PARCEL 2: Being known as 530 Bragg Street and more particularly described as follows: Beginning at a point in the southern line of Bragg Street, said point being 100 feet east of the intersection of Mineral Springs Branch and the southern line of Bragg Street runs thence in a southern direction 205 feet to a point in Mineral Springs Branch; thence in an eastern direction with said branch 51 feet; thence in a northern direction 217.1 feet to a point in the southern line of Bragg Street; thence in a western direction along the southern line of Bragg Street 50 feet to the point of beginning, being Lot No. 3 according to map registered in the office of the Register of Deeds for Wake County, North Carolina, in Book of Maps 1928, on page 115.",
+      "legal_description_short": "Lot No. 5, Watson Lands plat (Book of Maps 1885, page 25), known as 420 Watson Street, Raleigh, NC; AND Lot No. 3, Book of Maps 1928, page 115, known as 530 Bragg Street, Raleigh, NC",
+      "plat_book": "1885; 1928",
+      "plat_page": "25; 115",
+      "conveys_multiple_parcels": true,
+      "parcels_conveyed_count": 2,
+      "references_prior_deed_book": "595",
+      "references_prior_deed_page": "402",
+      "references_prior_deed_language": "For further reference see Book 595, page 402, Wake County Registry.",
+      "legal_match_to_parcel": "none",
+      "legal_match_method": "none",
+      "legal_match_notes": "No parcel_reference subdivision, lot, block, plat book, or plat page was provided to match against. The document conveys two distinct parcels (420 Watson Street and 530 Bragg Street) to two different grantees. Without a specific parcel identifier or address to match, legal match cannot be determined.",
+      "extraction_confidence": "medium",
+      "summary": "Warranty deed dated May 1, 1946, from Clem B. Holding and wife Katie Lee Holding (joined by I. O. Brady, Trustee, and Durham Life Insurance Company for release of a deed of trust) conveying two separate parcels: Lot 5 of Watson Lands (420 Watson Street) to Marion Weldon and wife Cora Weldon, and Lot 3 per Book of Maps 1928 page 115 (530 Bragg Street) to Sherman Robinson and wife Flora Robinson; recorded May 25, 1946 in Book 942, Page 81, Wake County Registry.",
+      "flags": [
+        "multi_parcel_conveyance",
+        "references_unretrieved_prior_deed",
+        "missing_critical_field"
+      ],
+      "created_at": "2026-05-06T11:00:34.191384",
+      "updated_at": "2026-05-06T11:00:34.191384"
+    },
+    {
+      "id": 4,
+      "property_id": 1,
+      "rod_capture_id": 3,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "DOROTHY DILLON LEWIS and husband, H. M. LEWIS",
+        "C. A. DILLON, Jr., and wife, MILDRED C. DILLON",
+        "GROVER L. DILLON, Jr., and wife, ANNIE A. DILLON",
+        "MARY FRANCES DILLON BAREFOOT and husband, GRAHAM BALLARD BAREFOOT, Jr."
+      ],
+      "grantee_names": [
+        "ROBINSON O. EVERETT AND EMANUEL J. EVANS, TRUSTEES",
+        "MORGAN MILLS, INC., a corporation organized and existing under and by virtue of the laws of the State of North Carolina"
+      ],
+      "recorded_date": "1978-06-06",
+      "instrument_date": "1978-05-29",
+      "book": "2625",
+      "page": "155",
+      "instrument_number": null,
+      "vesting_language": "a one-half (1/2) undivided interest to Robinson O. Everett and Emanuel J. Evans, Trustees, and a one-half (1/2) undivided interest to Morgan Mills, Inc.",
+      "legal_description_full": "FIRST TRACT: BEGINNING at a point marking the intersection of the north technical property line of West Martin Street with the west technical property line of South Dawson Street, said point of beginning being 33 feet north of the technical center line of West Martin Street and 33 feet west of the technical center line of South Dawson Street; runs thence in a northerly direction along the west technical property line of South Dawson Street and in a line parallel to and 33 feet west of the technical center line of South Dawson Street 126.71 feet to a point in the dividing line between the property of the City of Raleigh and the property herein described; runs thence in a westerly direction in a line almost perpendicular to the west technical property line of South Dawson Street a distance of 4.93 feet to the north face of the north wall of a brick building known as the Dillon-McLeod Building; thence continuing in a westerly direction along the north face of the north wall of said building (being in a line almost perpendicular to the west technical property line of South Dawson Street) a distance of 41.96 feet to a point evidenced by an offset in said north wall of the Dillon-McLeod Building; runs thence in a southerly direction along the west face of said wall at said offset a distance of 0.19 feet to a point; runs thence in a westerly direction along the north face of the north wall of said Dillon-McLeod Building (being in a line almost perpendicular to the west technical property line of South Dawson Street) 184.36 feet to a point evidenced by an iron pipe; runs thence in a northerly direction along the dividing line between the City of Raleigh property and the Dillon-McLeod Building property 49.59 feet to an iron pipe, a common corner with the City of Raleigh property and the Dillon-McLeod Building property; runs thence in a westerly direction in a line making an interior angle of 90 degrees with the preceding line and being along the dividing line between the property formerly owned by Dillon Supply Company and the property of the City of Raleigh as shown on the map showing the dividing line recorded in Book of Maps 1952, page 26, Wake County Registry, 188.75 feet to the east technical property line of South Harrington Street; runs thence in a southerly direction along the east technical property line of South Harrington Street 176 feet to a point marking the intersection of the east technical property line of South Harrington Street with the north technical property line of West Martin Street; runs thence in an easterly direction along the north technical property line of West Martin Street 420 feet to the point and place of BEGINNING.\n\nSECOND TRACT: BEGINNING at the point of intersection of the north technical property line of West Martin Street and the west technical property line of South Dawson Street, said point being 33 feet north of the technical center line of West Martin Street and 33 feet west of the technical center line of South Dawson Street, runs thence in a westerly direction along the south line of the First Tract above described and being along said north technical property line of West Martin Street, a distance of 420 feet to the intersection of the east technical property line of South Harrington Street with the north technical property line of West Martin Street; runs thence in a southerly direction along the east technical property line of South Harrington Street 5.39 feet to a point in the north visible property line of West Martin Street; runs thence in an easterly direction along said north visible property line of West Martin Street 420 feet, more or less, to the point of intersection of said north visible property line of West Martin Street with the west technical property line of South Dawson Street; runs thence in a northerly direction along said west technical property line of South Dawson Street a distance of 4.75 feet, more or less, to the point and place of BEGINNING.",
+      "legal_description_short": "Two tracts in the City of Raleigh, Wake County, NC bounded by West Martin Street, South Dawson Street, South Harrington Street, and the Dillon-McLeod Building; described by metes and bounds.",
+      "plat_book": "Book of Maps 1952",
+      "plat_page": "26",
+      "conveys_multiple_parcels": true,
+      "parcels_conveyed_count": 2,
+      "references_prior_deed_book": null,
+      "references_prior_deed_page": null,
+      "references_prior_deed_language": null,
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "metes_bounds",
+      "legal_match_notes": "No parcel ID or subdivision/lot reference provided in parcel_reference beyond county and parcel ID 0060673. The deed describes two metes-and-bounds tracts in downtown Raleigh at the intersection of West Martin Street, South Dawson Street, and South Harrington Street. Cannot confirm match to parcel 0060673 without additional reference data. Match rated low due to multi-parcel conveyance and absence of lot/plat reference in parcel_reference.",
+      "extraction_confidence": "high",
+      "summary": "Warranty deed dated May 29, 1978, from Dorothy Dillon Lewis and husband H. M. Lewis, C. A. Dillon Jr. and wife Mildred C. Dillon, Grover L. Dillon Jr. and wife Annie A. Dillon, and Mary Frances Dillon Barefoot and husband Graham Ballard Barefoot Jr., conveying two metes-and-bounds tracts in the City of Raleigh, Wake County, NC to Robinson O. Everett and Emanuel J. Evans as Trustees (one-half undivided interest) and Morgan Mills, Inc. (one-half undivided interest); recorded June 6, 1978 at Book 2625, Page 155.",
+      "flags": [
+        "multi_parcel_conveyance",
+        "ambiguous_vesting_language"
+      ],
+      "created_at": "2026-05-06T11:06:18.932851",
+      "updated_at": "2026-05-06T11:06:18.932851"
+    },
+    {
+      "id": 5,
+      "property_id": 2,
+      "rod_capture_id": 4,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "JAMES BRIAN ETHERIDGE and wife, SARAH J. ETHERDIGE"
+      ],
+      "grantee_names": [
+        "JOHNNY W. ETHERIDGE"
+      ],
+      "recorded_date": "2018-06-25",
+      "instrument_date": "2018-06-25",
+      "book": "017164",
+      "page": "02182",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "BEING all of Lot 4, containing 1.46 net acres, as shown on the map entitled \"Recombination of Lots for Nancy Burger, Marks Creek Township, Wake County, North Carolina\" recorded in Book of Maps 1983, Page 1401, Wake County Registry.",
+      "legal_description_short": "Lot 4, 1.46 net acres, Recombination of Lots for Nancy Burger, Marks Creek Township, Wake County, NC; Book of Maps 1983, Page 1401",
+      "plat_book": "1983",
+      "plat_page": "1401",
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "16957",
+      "references_prior_deed_page": "2757",
+      "references_prior_deed_language": "All or a portion of the property hereinabove described was acquired by Grantor by instrument recorded in Book 16957, Page 2757, Wake County Registry.",
+      "legal_match_to_parcel": "medium",
+      "legal_match_method": "plat_reference",
+      "legal_match_notes": "Parcel reference provides only parcel_id 0028719 and county; no subdivision/lot/plat book/page provided for direct comparison. Tax Map No. 0028719 on the deed face matches the parcel_id in the reference. Plat book and page are present in the deed but no parcel_reference plat data was supplied for cross-check. Match elevated to medium based on Tax Map No. alignment.",
+      "extraction_confidence": "high",
+      "summary": "North Carolina General Warranty Deed dated June 25, 2018, from James Brian Etheridge and wife Sarah J. Etheridge to Johnny W. Etheridge, conveying all of Lot 4 (1.46 net acres) per the Recombination of Lots for Nancy Burger plat recorded in Book of Maps 1983, Page 1401, Wake County Registry; recorded at Book 017164, Page 02182.",
+      "flags": [
+        "references_unretrieved_prior_deed",
+        "ambiguous_vesting_language"
+      ],
+      "created_at": "2026-05-06T11:17:02.630816",
+      "updated_at": "2026-05-06T11:17:02.630816"
+    },
+    {
+      "id": 6,
+      "property_id": 2,
+      "rod_capture_id": 5,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "WENDY LYNNE MICKLER (FORMERLY ODETTE) AND HUSBAND, BENJAMIN MICKLER"
+      ],
+      "grantee_names": [
+        "JAMES BRIAN ETHERIDGE AND WIFE, SARAH JENKINS ETHERIDGE"
+      ],
+      "recorded_date": "2000-09-26",
+      "instrument_date": "2000-09-25",
+      "book": "008691",
+      "page": "01965",
+      "instrument_number": null,
+      "vesting_language": "JAMES BRIAN ETHERIDGE AND WIFE, SARAH JENKINS ETHERIDGE",
+      "legal_description_full": "BEING ALL OF LOT 37, NORTHWINDS SUBDIVISION, SECTION 1, AS SHOWN ON THE MAP RECORDED IN BOOK OF MAPS 1986, PAGE 1232, WAKE COUNTY REGISTRY.",
+      "legal_description_short": "Lot 37, Northwinds Subdivision, Section 1",
+      "plat_book": "1986",
+      "plat_page": "1232",
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": null,
+      "references_prior_deed_page": null,
+      "references_prior_deed_language": "The property hereinabove described was acquired by Grantor by instrument recorded in Book , Page .",
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "plat_reference",
+      "legal_match_notes": "Parcel reference provided only includes parcel_id 0028719 with no subdivision, lot, plat book, or plat page to cross-check. Tax Lot No. on document is 0157019, which does not match parcel_id 0028719. Cannot confirm match without additional parcel reference data.",
+      "extraction_confidence": "medium",
+      "summary": "North Carolina General Warranty Deed dated September 25, 2000, conveying Lot 37, Northwinds Subdivision, Section 1 (Book of Maps 1986, Page 1232, Wake County) from Wendy Lynne Mickler (formerly Odette) and husband Benjamin Mickler to James Brian Etheridge and wife Sarah Jenkins Etheridge; recorded September 26, 2000 in Book 8691, Pages 1965-1967.",
+      "flags": [
+        "references_unretrieved_prior_deed",
+        "missing_critical_field",
+        "ambiguous_vesting_language"
+      ],
+      "created_at": "2026-05-06T11:18:10.984031",
+      "updated_at": "2026-05-06T11:18:10.984031"
+    },
+    {
+      "id": 7,
+      "property_id": 2,
+      "rod_capture_id": 6,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "Nancy Burger"
+      ],
+      "grantee_names": [
+        "Johnny W. Etheridge"
+      ],
+      "recorded_date": "2002-08-01",
+      "instrument_date": "2002-08-01",
+      "book": "9524",
+      "page": "988",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "BEING all of Lot 4, containing 1.46 net acres, as shown on the map entitled \"Recombination of Lots for Nancy Burger, Marks Creek Township, Wake County, North Carolina\" recorded in Book of Maps 1983, Page 1401, Wake County Registry.",
+      "legal_description_short": "Lot 4, Book of Maps 1983/1401, Marks Creek Township, Wake County, NC, 1.46 net acres",
+      "plat_book": "1983",
+      "plat_page": "1401",
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "2822",
+      "references_prior_deed_page": "511",
+      "references_prior_deed_language": "The property hereinabove described was acquired by Grantor by instrument recorded in Book 2822 Page 511",
+      "legal_match_to_parcel": "medium",
+      "legal_match_method": "plat_reference",
+      "legal_match_notes": "Parcel reference provides only parcel_id 0028719 and county; no subdivision/lot/plat_book/plat_page provided for direct comparison. Tax Lot No. on document face is 0028719, matching the parcel_id. Plat reference is Book of Maps 1983, Page 1401, Lot 4. Match assessed as medium based on tax lot number alignment.",
+      "extraction_confidence": "high",
+      "summary": "North Carolina General Warranty Deed from Nancy Burger to Johnny W. Etheridge conveying Lot 4 (1.46 net acres) per Book of Maps 1983, Page 1401, Marks Creek Township, Wake County, NC; recorded August 1, 2002 at Book 9524, Pages 988-990. Grantor acquired the property per deed recorded at Book 2822, Page 511.",
+      "flags": [
+        "references_unretrieved_prior_deed",
+        "ambiguous_vesting_language"
+      ],
+      "created_at": "2026-05-06T11:21:12.114388",
+      "updated_at": "2026-05-06T11:21:12.114388"
+    },
+    {
+      "id": 8,
+      "property_id": 2,
+      "rod_capture_id": 7,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "Johnny W. Etheridge"
+      ],
+      "grantee_names": [
+        "James Brian Etheridge"
+      ],
+      "recorded_date": "2017-11-02",
+      "instrument_date": "2017-11-02",
+      "book": "016957",
+      "page": "02757",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "BEING all of Lot 4, containing 1.46 net acres, as shown on the map entitled \"Recombination of Lots for Nancy Burger, Marks Creek Township, Wake County, North Carolina\" recorded in Book of Maps 1983, Page 1401, Wake County Registry.",
+      "legal_description_short": "Lot 4, Book of Maps 1983/1401, Marks Creek Township, Wake County, NC",
+      "plat_book": "1983",
+      "plat_page": "1401",
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "9524",
+      "references_prior_deed_page": "988",
+      "references_prior_deed_language": "All or a portion of the property hereinabove described was acquired by Grantor by instrument recorded in Book 9524, Page 988, Wake County Registry.",
+      "legal_match_to_parcel": "medium",
+      "legal_match_method": "plat_reference",
+      "legal_match_notes": "Parcel reference provides only parcel_id 0028719 and county; no subdivision/lot/plat_book/plat_page supplied for direct comparison. Tax Map No. 0028719 on the deed face matches the provided parcel_id. Plat reference is Book of Maps 1983/1401, Lot 4. Match is medium pending confirmation of plat reference against parcel records.",
+      "extraction_confidence": "high",
+      "summary": "General Warranty Deed from Johnny W. Etheridge to James Brian Etheridge conveying Lot 4 (1.46 acres) per the Recombination of Lots for Nancy Burger map recorded in Book of Maps 1983, Page 1401, Wake County Registry; recorded November 2, 2017 at Book 016957, Page 02757. Grantor acquired the property per deed at Book 9524, Page 988.",
+      "flags": [
+        "references_unretrieved_prior_deed"
+      ],
+      "created_at": "2026-05-06T11:22:26.924050",
+      "updated_at": "2026-05-06T11:22:26.924050"
+    },
+    {
+      "id": 9,
+      "property_id": 3,
+      "rod_capture_id": 8,
+      "court_capture_id": null,
+      "document_type": "quitclaim",
+      "grantor_names": [
+        "Viola Hicks (widow)"
+      ],
+      "grantee_names": [
+        "Lydia Hayes, her heirs and assigns"
+      ],
+      "recorded_date": "1954-06-17",
+      "instrument_date": "1954-06-15",
+      "book": "1155",
+      "page": "171",
+      "instrument_number": null,
+      "vesting_language": "to her only use and behoof forever",
+      "legal_description_full": "BEGINNING at a stake on the North side of Fort Street (now called Nelson Street), now or formerly Dennis Kearney's corner, and running along said Street in an Easterly direction, 60 feet; thence in a Northerly direction, along line of lands of J. R. Mangum, formerly, now Viola Hicks, 120 feet and 3 inches; thence in a Westerly direction along line of land of Will Debnam, 60 feet to a stake, in Dennis Kearney's line; thence, in a Southerly direction, along line of the Kearney land, 120 feet 3 inches, to the point of BEGINNING.",
+      "legal_description_short": "Lot on North side of Fort Street (now Nelson Street), Town of Wake Forest, Wake County, NC; 60 ft frontage x 120 ft 3 in depth, bounded by Kearney, Mangum/Hicks, and Debnam lines.",
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": false,
+      "parcels_conveyed_count": 1,
+      "references_prior_deed_book": "860",
+      "references_prior_deed_page": "53",
+      "references_prior_deed_language": "on February 3, 1941, W. W. Holding and wife, Josephine H. Holding, executed and delivered a deed to Viola Hicks, conveying a certain lot or lots of land situated in the Town of Wake Forest, Wake County and State of North Carolina, which said deed was duly recorded in the Office of Register of Deeds for Wake County, North Carolina, in Book 860, at page 53",
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "metes_bounds",
+      "legal_match_notes": "No parcel ID or plat reference available in document to confirm match to parcel 0029590. Legal description is metes-and-bounds referencing Fort Street/Nelson Street in Town of Wake Forest, Wake County. Cannot confirm match without additional parcel data.",
+      "extraction_confidence": "medium",
+      "summary": "Quitclaim deed dated June 15, 1954, from Viola Hicks (widow) to Lydia Hayes, conveying a lot on the north side of Fort Street (now Nelson Street) in Town of Wake Forest, Wake County, NC; executed to correct a mutual mistake in a prior 1941 deed recorded at Book 860, Page 53, which inadvertently included this lot intended for Lydia Hayes. Recorded June 17, 1954, at Book 1155, Page 171.",
+      "flags": [
+        "corrective_or_quitclaim_deed",
+        "references_unretrieved_prior_deed",
+        "cursive_or_old_formatting",
+        "low_ocr_readability"
+      ],
+      "created_at": "2026-05-06T11:31:26.581851",
+      "updated_at": "2026-05-06T11:31:26.581851"
+    },
+    {
+      "id": 10,
+      "property_id": 3,
+      "rod_capture_id": 9,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "Kathryn Baker Cummings and husband Paul Cummings",
+        "W. W. Holding and wife, Josephine H. Holding"
+      ],
+      "grantee_names": [
+        "D. A. Baker and wife, Annie B. Baker",
+        "Lydia Hayes"
+      ],
+      "recorded_date": "1944-11-06",
+      "instrument_date": "1944-09-29",
+      "book": "913",
+      "page": "352",
+      "instrument_number": null,
+      "vesting_language": "D. A. Baker and wife, Annie B. Baker their heirs and assigns; Lydia Hayes her heirs and assigns",
+      "legal_description_full": "1st. Tract: BEGINNING at the rock ford (White Oak Creek) in C. J. Burt's corner and runs thence up the various courses of said creek to a stake and pointers, corner of lot No. 4; thence 3/4 deg. East 9 chains to a stake and pointers in the line of lot No. 4 corner of lot No. 5; thence North 89 deg. West 16 chains to a stake and pointers in said Burt line; corner of lot No. 5; thence South 5\u00bd deg. West 17.20 chains to the point of beginning, containing 25.17 acres, more or less, and being the same land which was conveyed to Rudolph J. Baker by J. E. Pearson, Commissioner by deed dated October 11, 1930 and recorded in Book 608 at page 217, Wake County Registry. See Book 857 page 449, Wake County Registry, said property herein being lot or tract No. TWO of said deed. 2nd. tract: That tract or parcel of land situated in Buckhorn Township, Wake County, North Carolina, same being lot No. 4 in the Division of the lands of Nancy E. Williams, deceased, containing 14.77 acres, more or less. For a more complete description of said land reference is hereby made to Book 'D' of partitions Page 429, Office of the Register of Deeds for Wake County, North Carolina. Being the same identical land described in a deed dated April 22, 1919, by Clarence J. Smith, Trustee, to J. A. Hockaday, and recorded in Book 338 at page 597, in Wake County Registry. This is the same land that was conveyed to Rudolph J. Baker by J. A. Hockaday and wife Florence Hockaday by deed dated August 20, 1930, and recorded in Book 592 page 426, Wake County Registry. See also Book 857 page 449, Wake County Registry. 3rd. tract: Lying and being in Buckhorn Township, Wake County, and being lot No. 3 as shown on the plat and survey made by C. H. Collins, surveyor, February 1914, attached to the report of Commissioners in Special Proceedings, No. 2031, Record of Partitions 'D' Page 443, in the office of Clerk of the Superior Court, Wake County, and described as follows: BEGINNING at a stake and pointers in F. C. Adams line, corner of lot No. 2 running thence South 3/4 deg. West 2.68 chains to an old field pine, said Adams corner in the line of lot No. 5; thence South 89 deg. East 2.65 chains to a stake and pointers corner of lot No. 5; thence South 3/4 deg. West 8.03 chains to a stake and pointers in the line of lot No. 5 corner of lot No. 4; thence South 87 deg. East 20.55 chains to a stake and pointers just on the West side of the road; thence North 7 deg. East with said road 10.65 chains to a stake and pointers corner of lot No. 2; thence North 87 deg. West 24 chains to the beginning, containing 23.07 acres, more or less, and being the same land allotted to J. C. Williams in the partition of the lands of Nancy Williams by Commissioner C. H. Collins, C. J. Burt and G. H. Holloway in the Special Proceedings before referred to, and being the same land which was conveyed to Rudolph J. Baker by Wm. B. Oliver and wife, see Book 608 page 220, Wake County Registry. [Second deed on pages 3-5: W. W. Holding and wife Josephine H. Holding to Lydia Hayes \u2014 lot in Wake Forest, Wake County, NC, on North Side of Fort Street, Dennis Kearney's corner, running Easterly 60 feet; thence Northerly along J. R. Mangum's line 120 feet and 3 inches; thence Westerly along Will Debnam's line 60 feet to Dennis Kearney's line; thence Southerly 120 feet and 3 inches to point of BEGINNING, together with right to use of a well situated between the above described lot and a lot belonging to J. R. Mangum.]",
+      "legal_description_short": "Two separate deeds recorded consecutively: (1) Cummings to D.A. Baker & wife \u2014 three tracts in Buckhorn Township, Wake County, totaling approx. 63 acres; (2) W.W. Holding & wife to Lydia Hayes \u2014 lot on North Side of Fort Street, Wake Forest, Wake County, 60x120 ft.",
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": true,
+      "parcels_conveyed_count": 4,
+      "references_prior_deed_book": "608",
+      "references_prior_deed_page": "217",
+      "references_prior_deed_language": "being the same land which was conveyed to Rudolph J. Baker by J. E. Pearson, Commissioner by deed dated October 11, 1930 and recorded in Book 608 at page 217, Wake County Registry. See Book 857 page 449, Wake County Registry; also Book 592 page 426; Book 338 page 597; Book 608 page 220, Wake County Registry.",
+      "legal_match_to_parcel": "none",
+      "legal_match_method": "none",
+      "legal_match_notes": "No parcel_reference short legal, subdivision, lot, plat book, or plat page was provided. The document contains two separate deeds recorded consecutively at Book 913 pages 352-354+. Without a specific parcel identifier to match against, no legal match can be confirmed. The parcels described are rural acreage tracts in Buckhorn Township and a town lot in Wake Forest \u2014 neither matches a standard subdivision lot reference.",
+      "extraction_confidence": "medium",
+      "summary": "This record contains two separate warranty deeds recorded consecutively in Book 913 beginning at page 352: (1) Kathryn Baker Cummings and husband Paul Cummings to D. A. Baker and wife Annie B. Baker, conveying three tracts of land in Buckhorn Township, Wake County, NC totaling approximately 63 acres, dated September 29, 1944, registered November 6, 1944; and (2) W. W. Holding and wife Josephine H. Holding to Lydia Hayes, conveying a town lot on Fort Street in Wake Forest, Wake County, NC, dated August 1, 1944.",
+      "flags": [
+        "multi_parcel_conveyance",
+        "references_unretrieved_prior_deed",
+        "missing_critical_field"
+      ],
+      "created_at": "2026-05-06T11:32:44.304322",
+      "updated_at": "2026-05-06T11:32:44.304322"
+    },
+    {
+      "id": 11,
+      "property_id": 3,
+      "rod_capture_id": 10,
+      "court_capture_id": null,
+      "document_type": "warranty_deed",
+      "grantor_names": [
+        "W. W. Holding",
+        "Josephine A. Holding"
+      ],
+      "grantee_names": [
+        "Viola Hicks"
+      ],
+      "recorded_date": "1941-07-11",
+      "instrument_date": "1941-02-03",
+      "book": "860",
+      "page": "53",
+      "instrument_number": null,
+      "vesting_language": null,
+      "legal_description_full": "BEGINS AT A STONE ON WEST SIDE OF ROAD FROM W. O. ALLEN'S PLACE TO CHURCH STREET IN THE TOWN OF WAKE FOREST AND RUNS ALONG THE WESTERN BOUNDRY OF SAID ROAD N. 1/2 DEGREE E. 2 11/100 CHAINS TO A STONE WILL DEBNAM'S SOUTH EAST CORNER; THENCE WITH HIS LINE N. 65 DEGREES W. 1 73/100 CHAINS TO A STONE CHAMPION KEARNEY'S CORNER; THENCE WITH HIS LINE S. 15 DEGREES WEST 2 CHAINS TO A STONE ON NORTH SIDE OF EAST PINE STREET OF SAID TOWN; THENCE WITH THE NORTHERN BOUNDARY OF SAID STREET S. 65 DEGREES E. 2 19/100 CHAINS TO THE BEGINNING. BEING LOTS 19 AND 19A OF LANDS CONVEYED TO MOSES FORT BY MRS. M. E. SIMMONS, H. A. CHAPPELL, SURVEYOR, RECORDED IN OFFICE OF REGISTER OF DEEDS FOR WAKE COUNTY, IN BOOK 232, AT PAGE 297 AND BOOK 657, AT PAGE 368, AND BOOK 856 AT PAGE 598.",
+      "legal_description_short": "Lots 19 and 19A, Town of Wake Forest, Wake County, NC",
+      "plat_book": null,
+      "plat_page": null,
+      "conveys_multiple_parcels": true,
+      "parcels_conveyed_count": 2,
+      "references_prior_deed_book": "856",
+      "references_prior_deed_page": "598",
+      "references_prior_deed_language": "BEING LOTS 19 AND 19A OF LANDS CONVEYED TO MOSES FORT BY MRS. M. E. SIMMONS, H. A. CHAPPELL, SURVEYOR, RECORDED IN OFFICE OF REGISTER OF DEEDS FOR WAKE COUNTY, IN BOOK 232, AT PAGE 297 AND BOOK 657, AT PAGE 368, AND BOOK 856 AT PAGE 598.",
+      "legal_match_to_parcel": "low",
+      "legal_match_method": "narrative",
+      "legal_match_notes": "No parcel_reference lot/subdivision/plat data provided to match against. Deed conveys Lots 19 and 19A in Wake Forest, Wake County by metes-and-bounds with prior deed references. Cannot confirm match to parcel 0029590 without additional reference data. Multi-parcel conveyance adds ambiguity.",
+      "extraction_confidence": "medium",
+      "summary": "Warranty deed from W. W. Holding and wife Josephine A. Holding to Viola Hicks conveying Lots 19 and 19A in the Town of Wake Forest, Wake County, NC, described by metes and bounds; instrument dated February 3, 1941, recorded July 11, 1941 in Book 860, Page 53.",
+      "flags": [
+        "handwritten_document",
+        "cursive_or_old_formatting",
+        "multi_parcel_conveyance",
+        "references_unretrieved_prior_deed"
+      ],
+      "created_at": "2026-05-06T11:33:56.383797",
+      "updated_at": "2026-05-06T11:33:56.383797"
+    }
+  ],
+  "investigation_sessions": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "status": "flagged_for_review",
+      "current_phase": "A",
+      "started_at": "2026-05-06T10:55:16.440725",
+      "completed_at": "2026-05-06T11:11:58.223099",
+      "iteration_count": 0,
+      "stop_reason": "estate_path_unresolved",
+      "created_at": "2026-05-06T10:55:16.440725",
+      "updated_at": "2026-05-06T11:11:58.223099"
+    },
+    {
+      "id": 2,
+      "property_id": 2,
+      "status": "flagged_for_review",
+      "current_phase": "A",
+      "started_at": "2026-05-06T11:15:14.981222",
+      "completed_at": "2026-05-06T11:27:37.214358",
+      "iteration_count": 0,
+      "stop_reason": "estate_path_unresolved",
+      "created_at": "2026-05-06T11:15:14.981222",
+      "updated_at": "2026-05-06T11:27:37.214358"
+    },
+    {
+      "id": 3,
+      "property_id": 3,
+      "status": "flagged_for_review",
+      "current_phase": "A",
+      "started_at": "2026-05-06T11:30:27.040674",
+      "completed_at": "2026-05-06T11:38:40.547309",
+      "iteration_count": 0,
+      "stop_reason": "estate_path_unresolved",
+      "created_at": "2026-05-06T11:30:27.040674",
+      "updated_at": "2026-05-06T11:38:40.547309"
+    }
+  ],
+  "investigation_questions": [
+    {
+      "id": 1,
+      "session_id": 1,
+      "question": "Could not locate an acquisition deed showing when Eton (Everett) Robinson received this property. Searched grantee name variants (Robinson Everett; Everett Robinson O /TR; Robinson Eton; Robinson E; Everett Robinson) with no deed having legal_match >= medium predating 02/20/2026. Name-variant budget (5 attempts) exhausted for grantor 'Everett'. Next step: Phase D estate search for descent from Jacob Robinson or Doris Elaine Kilpatrick.",
+      "actions_taken": "Searched grantee variants: ROBINSON EVERETT; EVERETT ROBINSON O /TR; ROBINSON ETON; ROBINSON E; EVERETT ROBINSON; pulled captures 3 (1978) and 2 (1946) and reviewed capture 1 (2026). Performed Document Analyst reads and applied legal_description_hint. Budget exhausted.",
+      "resolution": "unresolved_flagged",
+      "resolution_notes": "Exhausted name-variant budget (5 attempts) searching for an acquisition deed showing when Everett (Eton) Robinson received the property. Pulled candidate deeds (capture_id 3 book 002625 p155) but legal_match was LOW; could not locate a deed with legal_match >= medium predating 02/20/2026. Court search found no estate/deed of distribution. Proceeding to flag review.",
+      "created_at": "2026-05-06T11:07:45.024732",
+      "updated_at": "2026-05-06T11:11:51.628155"
+    }
+  ],
+  "investigation_trace": [
+    {
+      "id": 1,
+      "session_id": 1,
+      "step_number": 1,
+      "action": "Phase A completed: processed appraiser transfer history rows",
+      "input": "[{\"id\":1,\"book\":\"20149\",\"page\":\"1739\"}]",
+      "output": "Updated transfer_id 1 to verified_with_discrepancy; pulled capture_id 1 extraction_id 1; deed is warranty_deed dated 02/20/2026 with high legal match; references prior deed book 942 page 83.",
+      "created_at": "2026-05-06T10:57:31.716085"
+    },
+    {
+      "id": 2,
+      "session_id": 1,
+      "step_number": 2,
+      "action": "Phase B completed: Wake County grantee search and pulls",
+      "input": "Search for grantee 'REAL PROPERTY ADMINISTRATION PARTNE' and name variants; pulled captures 1,2,3; pulled referenced prior deed 942/83 from capture 1; filtered many non-deed or non-matching results; noted corrective/quitclaim signals: none besides references to prior deeds.",
+      "output": "Phase B: pulled capture_ids [1,2,3]; capture 1 (extraction 1) is warranty_deed dated 02/20/2026 with high legal match to parcel and references prior deed 942/83; capture 2 (extraction 3) is 1946 deed cover including 530 Bragg Street but initial low legal_match updated to high when legal_hint applied; capture 3 (extraction 4) is 1978 deed with low legal match. One open question created re: acquisition deed for Everett Robinson (question_id 1).",
+      "created_at": "2026-05-06T11:07:51.783478"
+    },
+    {
+      "id": 3,
+      "session_id": 1,
+      "step_number": 3,
+      "action": "Phase D completed: court search",
+      "input": "Searched court records for deceased owners referenced in primary grantor: JACOB ROBINSON and DORIS ELAINE KILPATRICK",
+      "output": "Court Expert returned multiple non-estate civil/criminal matters for JACOB ROBBIN(S); no estate (case type E or SP with caption 'Estate of' or 'In Re') found for JACOB ROBINSON. No records found for DORIS ELAINE KILPATRICK. No deed of distribution located.",
+      "created_at": "2026-05-06T11:11:15.330674"
+    },
+    {
+      "id": 4,
+      "session_id": 2,
+      "step_number": 1,
+      "action": "Phase A complete: processed appraiser transfer history rows",
+      "input": "[{\"id\":2,\"property_id\":2,\"book\":\"-E-  -\",\"page\":null,...}]",
+      "output": "Updated transfer_id 2 to not_findable due to invalid book/page",
+      "created_at": "2026-05-06T11:16:24.807250"
+    },
+    {
+      "id": 5,
+      "session_id": 2,
+      "step_number": 2,
+      "action": "Phase B complete: Wake County grantee search and pulls",
+      "input": "Search for grantee ETHERIDGE, JOHNNY W \u2014 results list included books 004558,002846,009524,016736,017164,017103 etc.",
+      "output": "Pulled captures matching current owner: capture_id 6 (book 009524 page 00988, 08/01/2002, Burger->Johnny, legal_match high), capture_id 4 (book 017164 page 02182, 06/25/2018, James->Johnny, legal_match medium). Skipped non-deed or non-matching results. Note: capture 4 referenced prior deed book 16957 page 2757 (pulled during Phase C).",
+      "created_at": "2026-05-06T11:26:10.045565"
+    },
+    {
+      "id": 6,
+      "session_id": 2,
+      "step_number": 3,
+      "action": "Phase C complete: primary document selection and one-hop chain-back",
+      "input": "Primary selected: capture_id 4 (book 017164 page 02182, recording_date 06/25/2018) grantee JOHNNY W ETHERIDGE, legal_match=medium. Chain-back: capture_id 7 (book 016957 page 02757, recording_date 11/02/2017) shows grantor JOHNNY W ETHERIDGE -> grantee JAMES BRIAN ETHERIDGE, legal_match=high. capture_id 6 (book 009524 page 00988, recording_date 08/01/2002) is Burger->Johnny (legal_match=high) referenced in capture 7. capture_id 5 (book 008691 page 01965, recording_date 09/26/2000) was pulled as a candidate for James but has legal_match=low. No corrective/quitclaim exceptions apply.",
+      "output": "Primary document verified as capture_id 4; chain-back found capture_id 7 satisfying one-hop verification.",
+      "created_at": "2026-05-06T11:26:46.806825"
+    },
+    {
+      "id": 7,
+      "session_id": 2,
+      "step_number": 4,
+      "action": "Phase D court search complete",
+      "input": "Searched Wake County court records for ETHERIDGE, JOHNNY W (estate search)",
+      "output": "Court Expert returned no estate (E or SP) cases or deeds of distribution for JOHNNY W ETHERIDGE",
+      "created_at": "2026-05-06T11:27:10.070257"
+    },
+    {
+      "id": 8,
+      "session_id": 3,
+      "step_number": 1,
+      "action": "Phase A complete \u2014 appraiser transfer history verification",
+      "input": "{\"appraiser_transfer_history\": []}",
+      "output": "No appraiser transfer history rows to process; no Update_Appraiser_Verification calls made.",
+      "created_at": "2026-05-06T11:37:14.059183"
+    },
+    {
+      "id": 9,
+      "session_id": 3,
+      "step_number": 2,
+      "action": "Phase B complete \u2014 Wake County grantee search and deed pulls",
+      "input": "{\"search_task\":\"search Wake County grantee surname=HAYES first_name=LYDIA \u2014 SEARCH ONLY\",\"search_results\":[{\"book\":\"006511\",\"page\":\"00265\",\"doc_type\":\"MODIFICATION\",\"grantor\":\"HAYES LYDIA\",\"grantee\":\"HAYES LYDIA\",\"recording_date\":\"04/28/1995\"},{\"book\":\"001155\",\"page\":\"00171\",\"doc_type\":\"DEED\",\"grantor\":\"HICKS VIOLA\",\"grantee\":\"HAYES LYDIA\",\"recording_date\":\"06/17/1954\"},{\"book\":\"000913\",\"page\":\"00354\",\"doc_type\":\"DEED\",\"grantor\":\"HOLDING W W\",\"grantee\":\"HAYES LYDIA\",\"recording_date\":\"10/10/1944\"}]}",
+      "output": "Pulled deeds: capture_id 8 (book 001155 page 00171, quitclaim, extraction_id 9), capture_id 9 (book 000913 page 00354, warranty_deed, extraction_id 10). Skipped: book 006511 page 00265 (MODIFICATION) as non-deed. Marked capture_id 8 as a quitclaim/corrective deed to be evaluated in Phase C; it references prior deed book 860 page 53.",
+      "created_at": "2026-05-06T11:38:00.909813"
+    },
+    {
+      "id": 10,
+      "session_id": 3,
+      "step_number": 3,
+      "action": "Phase C complete \u2014 primary deed selection and 30-year rule application",
+      "input": "Pulled candidate deeds: capture_id 9 (book 000913 page 00354, warranty_deed, recording_date 10/10/1944, extraction_id 10, legal_match=medium); capture_id 8 (book 001155 page 00171, quitclaim, recording_date 06/17/1954, extraction_id 9, legal_match=high). Primary selected: capture_id 8 (quitclaim, 06/17/1954). Primary is pre-1996 -> 30-year stopping rule applies. Pulled referenced prior deed for quitclaim: capture_id 10 (book 000860 page 00053, recording_date 02/11/1941, extraction_id 11).",
+      "output": "Primary deed is capture_id 8 (extraction_id 9). 30-year rule invoked; backward chain satisfied. Referenced prior deed capture_id 10 pulled per quitclaim requirement and read (extraction_id 11). Forward chain check to follow.",
+      "created_at": "2026-05-06T11:38:30.354685"
+    }
+  ],
+  "incidental_records": [],
+  "chain_conclusions": [
+    {
+      "id": 1,
+      "property_id": 1,
+      "status": "active",
+      "current_owners": [
+        {
+          "raw_name": "REAL PROPERTY ADMINISTRATION PARTNE",
+          "is_deceased": false,
+          "normalized_name": "Real Property Administration Partners LLC",
+          "deceased_signals": [],
+          "deceased_confidence": "unknown"
+        }
+      ],
+      "acquisition_type": "deed",
+      "acquisition_document_refs": {
+        "primary_document": {
+          "book": "020149",
+          "page": "01739",
+          "document_type": "warranty_deed",
+          "extraction_id": "1",
+          "recorded_date": "2026-02-20"
+        },
+        "chain_back_document": {
+          "book": "942",
+          "page": "81",
+          "extraction_id": "2",
+          "recorded_date": "1946-05-25"
+        },
+        "supporting_documents": []
+      },
+      "vesting": "trust",
+      "vesting_evidence": {},
+      "legal_description_confidence": "low ",
+      "supporting_document_refs": [],
+      "flags": [
+        "references_unretrieved_prior_deed",
+        "multi_parcel_conveyance",
+        "missing_critical_field",
+        "low_ocr_readability",
+        "ambiguous_vesting_language",
+        "investigation_incomplete",
+        "phases_bc_not_completed",
+        "estate_path_unresolved",
+        "legal_description_low_confidence",
+        "chain_back_not_found"
+      ],
+      "verify_status": "pending",
+      "verify_objections": null,
+      "superseded_by_id": null,
+      "created_at": "2026-05-06T11:12:24.345713",
+      "updated_at": "2026-05-06T11:12:24.345713"
+    },
+    {
+      "id": 2,
+      "property_id": 2,
+      "status": "active",
+      "current_owners": [
+        {
+          "raw_name": "ETHERIDGE, JOHNNY W HEIRS",
+          "is_deceased": true,
+          "normalized_name": "JOHNNY W ETHERIDGE HEIRS",
+          "deceased_signals": [
+            {
+              "signal": "Name contains 'HEIRS' pattern indicating deceased owner",
+              "evidence_extraction_id": null
+            }
+          ],
+          "deceased_confidence": "confirmed"
+        }
+      ],
+      "acquisition_type": "deed",
+      "acquisition_document_refs": {
+        "primary_document": {
+          "book": "017164",
+          "page": "02182",
+          "document_type": "warranty_deed",
+          "extraction_id": "5",
+          "recorded_date": "2018-06-25"
+        },
+        "chain_back_document": {
+          "book": "016957",
+          "page": "02757",
+          "extraction_id": "8",
+          "recorded_date": "2017-11-02"
+        },
+        "supporting_documents": []
+      },
+      "vesting": "sole",
+      "vesting_evidence": {},
+      "legal_description_confidence": "medium ",
+      "supporting_document_refs": [],
+      "flags": [
+        "references_unretrieved_prior_deed",
+        "ambiguous_vesting_language",
+        "missing_critical_field",
+        "investigation_incomplete",
+        "phases_bc_not_completed",
+        "estate_path_unresolved"
+      ],
+      "verify_status": "objection_raised",
+      "verify_objections": {
+        "objections": [],
+        "reviewer_notes": null
+      },
+      "superseded_by_id": null,
+      "created_at": "2026-05-06T11:28:01.954526",
+      "updated_at": "2026-05-06T11:28:32.823282"
+    },
+    {
+      "id": 3,
+      "property_id": 3,
+      "status": "superseded",
+      "current_owners": [
+        {
+          "raw_name": "HAYES, LYDIA HEIRS",
+          "is_deceased": true,
+          "normalized_name": "Lydia Hayes",
+          "deceased_signals": [
+            {
+              "signal": "Name contains 'HEIRS' suffix, indicating deceased status",
+              "evidence_extraction_id": null
+            }
+          ],
+          "deceased_confidence": "confirmed"
+        }
+      ],
+      "acquisition_type": "deed",
+      "acquisition_document_refs": {
+        "primary_document": {
+          "book": "1155",
+          "page": "171",
+          "document_type": "quitclaim",
+          "extraction_id": 9,
+          "recorded_date": "1954-06-17"
+        },
+        "chain_back_document": {
+          "book": "860",
+          "page": "53",
+          "extraction_id": 11,
+          "recorded_date": "1941-07-11"
+        },
+        "supporting_documents": [
+          {
+            "role": "other",
+            "extraction_id": 10
+          }
+        ]
+      },
+      "vesting": "sole",
+      "vesting_evidence": {},
+      "legal_description_confidence": "low ",
+      "supporting_document_refs": [
+        {
+          "role": "other",
+          "extraction_id": 10
+        }
+      ],
+      "flags": [],
+      "verify_status": "pending",
+      "verify_objections": null,
+      "superseded_by_id": 4,
+      "created_at": "2026-05-06T11:39:11.252061",
+      "updated_at": "2026-05-06T11:39:18.484027"
+    },
+    {
+      "id": 4,
+      "property_id": 3,
+      "status": "active",
+      "current_owners": [
+        {
+          "raw_name": "HAYES, LYDIA HEIRS",
+          "is_deceased": true,
+          "normalized_name": "Lydia Hayes",
+          "deceased_signals": [
+            {
+              "signal": "Name contains 'HEIRS' suffix, indicating deceased status",
+              "evidence_extraction_id": null
+            }
+          ],
+          "deceased_confidence": "confirmed"
+        }
+      ],
+      "acquisition_type": "deed",
+      "acquisition_document_refs": {
+        "primary_document": {
+          "book": "1155",
+          "page": "171",
+          "document_type": "quitclaim",
+          "extraction_id": 9,
+          "recorded_date": "1954-06-17"
+        },
+        "chain_back_document": {
+          "book": "860",
+          "page": "53",
+          "extraction_id": 11,
+          "recorded_date": "1941-07-11"
+        },
+        "supporting_documents": [
+          {
+            "role": "other",
+            "extraction_id": 10
+          }
+        ]
+      },
+      "vesting": "sole",
+      "vesting_evidence": {},
+      "legal_description_confidence": "low ",
+      "supporting_document_refs": [
+        {
+          "role": "other",
+          "extraction_id": 10
+        }
+      ],
+      "flags": [
+        "corrective_or_quitclaim_deed",
+        "references_unretrieved_prior_deed",
+        "cursive_or_old_formatting",
+        "low_ocr_readability",
+        "multi_parcel_conveyance",
+        "missing_critical_field",
+        "handwritten_document",
+        "investigation_incomplete",
+        "phases_bc_not_completed",
+        "estate_path_unresolved",
+        "corrective_deed_in_chain",
+        "legal_description_low_confidence",
+        "primary_acquisition_low_legal_match"
+      ],
+      "verify_status": "pending",
+      "verify_objections": null,
+      "superseded_by_id": null,
+      "created_at": "2026-05-06T11:39:18.484027",
+      "updated_at": "2026-05-06T11:39:18.484027"
+    }
+  ]
+}

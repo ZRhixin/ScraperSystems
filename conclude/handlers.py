@@ -11,6 +11,30 @@ from datetime import date, datetime
 from database.db import get_conn, dict_cursor
 
 
+def _coerce_dict(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return {}
+
+
+def _coerce_list(value) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+
 def _json_serial(obj):
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()
@@ -154,14 +178,14 @@ def conclude_write(data: dict) -> tuple[int, dict]:
             """,
             (
                 property_id,
-                json.dumps(data.get("current_owners") or []),
+                json.dumps(_coerce_list(data.get("current_owners"))),
                 data.get("acquisition_type") or "unresolved",
-                json.dumps(data.get("acquisition_document_refs") or []),
+                json.dumps(_coerce_dict(data.get("acquisition_document_refs"))),
                 data.get("vesting") or "unresolved",
-                json.dumps(data.get("vesting_evidence") or []),
+                json.dumps(_coerce_dict(data.get("vesting_evidence"))),
                 data.get("legal_description_confidence") or "low",
-                json.dumps(data.get("supporting_document_refs") or []),
-                json.dumps(data.get("flags") or []),
+                json.dumps(_coerce_list(data.get("supporting_document_refs"))),
+                json.dumps(_coerce_list(data.get("flags"))),
             ),
         )
         new_id = cur.fetchone()[0]
