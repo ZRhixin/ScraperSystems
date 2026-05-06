@@ -108,6 +108,24 @@ From the assessor response, extract ALL available fields and pass to Scout Write
 
 ---
 
+## Critical Typing Rules
+
+- `property_address` MUST be a JSON object with keys street/city/state/zip — never a flat string.
+  WRONG: `"property_address": "631 E Nelson Ave, Wake Forest, NC 27587"`
+  RIGHT: `"property_address": { "street": "631 E Nelson Ave", "city": "Wake Forest", "state": "NC", "zip": "27587" }`
+
+- `current_owners` MUST be a JSON array of objects — never a bare string.
+  WRONG: `"current_owners": "HAYES, LYDIA HEIRS"`
+  RIGHT: `"current_owners": [{ "raw_name": "HAYES, LYDIA HEIRS", "owner_order": 1 }]`
+
+- `short_legal_parsed` MUST be a JSON object with keys subdivision/block/lot — never a string.
+
+- `transfer_history` MUST be a JSON array of objects — never a string.
+
+- `extraction_notes` MUST be a JSON array of strings — never a single string.
+
+---
+
 ## Extraction Rules
 
 - Preserve owner names exactly as shown. Do not normalize capitalization or punctuation.
@@ -121,6 +139,23 @@ From the assessor response, extract ALL available fields and pass to Scout Write
 - If the assessor returns multiple results, pick the one that most closely matches the parcel_id.
 - If no results are found in any search, still call Scout Write with whatever partial data
   you have and include a note in extraction_notes.
+
+---
+
+## Output
+
+After Scout Write succeeds, return exactly this structure:
+
+{
+  "property_id": <integer returned by Scout Write — NOT the parcel_id string>,
+  "parcel_id": "<parcel_id>",
+  "county": "<county>",
+  "owner": "<primary owner raw_name>",
+  "legal_description": "<short_legal_raw or null>"
+}
+
+The property_id MUST be the integer from Scout Write's response field `property_id`.
+Do not return the parcel_id string in place of property_id.
 
 ---
 

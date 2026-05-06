@@ -29,7 +29,7 @@ import time
 
 from curl_cffi import requests as cffi_requests
 
-from court.nc.session import build_session
+from court.nc.session import build_session, _TOKEN_FILE, refresh_waf_token, _TOKEN_FILE, refresh_waf_token
 
 BASE = "https://portal-nc.tylertech.cloud"
 _HOME = f"{BASE}/Portal/Home/Dashboard/29"
@@ -41,6 +41,19 @@ _TAX_PLAINTIFFS = (
     "county of ", "city of ", "town of ", "municipality",
     "tax collector", "treasurer", "board of county",
 )
+
+
+_WAF_SIGNALS = ("awsWafCoo", "Human Verification", "aws-waf-token")
+
+
+def _is_waf_blocked(resp) -> bool:
+    return resp.status_code == 202 or any(sig in resp.text[:600] for sig in _WAF_SIGNALS)
+
+
+def _invalidate_and_refresh() -> None:
+    if _TOKEN_FILE.exists():
+        _TOKEN_FILE.unlink()
+    refresh_waf_token(headless=False)
 
 
 def _new_session() -> cffi_requests.Session:
@@ -60,8 +73,6 @@ def search_by_name(name: str, county: str = "") -> list[dict]:
 
     Returns a list of matching parties, each with their cases.
     """
-    s = _new_session()
-
     court_location = f"{county} County" if county and not county.lower().endswith("county") else (county or "All Locations")
 
     payload = {
@@ -84,36 +95,45 @@ def search_by_name(name: str, county: str = "") -> list[dict]:
         "Search": "Submit",
     }
 
-    resp = s.post(
-        _SEARCH_URL,
-        data=payload,
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": _HOME,
-            "Origin": BASE,
-        },
-        allow_redirects=False,
-        timeout=30,
-    )
+    for attempt in range(2):
+        s = _new_session()
 
-    if resp.status_code not in (200, 302):
-        raise RuntimeError(f"SmartSearch POST returned {resp.status_code}: {resp.text[:300]}")
+        resp = s.post(
+            _SEARCH_URL,
+            data=payload,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": _HOME,
+                "Origin": BASE,
+            },
+            allow_redirects=False,
+            timeout=30,
+        )
 
-    # Brief pause — server needs a moment to prepare results before the GET is ready
-    time.sleep(2)
+        if _is_waf_blocked(resp):
+            if attempt == 0:
+                _invalidate_and_refresh()
+                continue
+            raise RuntimeError("SmartSearch blocked by WAF after token refresh — run: python -m court.nc.session")
 
-    ts = int(time.time() * 1000)
-    results_resp = s.get(
-        _RESULTS_URL,
-        params={"_": ts},
-        headers={
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
-            "Referer": f"{BASE}/Portal/SmartSearch/SmartSearch",
-        },
-        timeout=120,
-    )
+        if resp.status_code not in (200, 302):
+            raise RuntimeError(f"SmartSearch POST returned {resp.status_code}: {resp.text[:300]}")
 
-    return _parse_results(results_resp.text)
+        # Brief pause — server needs a moment to prepare results before the GET is ready
+        time.sleep(2)
+
+        ts = int(time.time() * 1000)
+        results_resp = s.get(
+            _RESULTS_URL,
+            params={"_": ts},
+            headers={
+                "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+                "Referer": f"{BASE}/Portal/SmartSearch/SmartSearch",
+            },
+            timeout=120,
+        )
+
+        return _parse_results(results_resp.text)
 
 
 def get_register_of_actions(case_url: str) -> list[dict]:
@@ -132,19 +152,28 @@ def get_register_of_actions(case_url: str) -> list[dict]:
         raise ValueError(f"Cannot extract case id from URL: {case_url}")
     encrypted_id = match.group(1)
 
-    s = _new_session()
     api_url = f"{_ROA_API}/{encrypted_id}/registerofactions"
-    resp = s.get(
-        api_url,
-        headers={
-            "Accept": "application/json",
-            "Referer": case_url,
-        },
-        timeout=20,
-    )
 
-    if resp.status_code != 200:
-        raise RuntimeError(f"Register of Actions API returned {resp.status_code}")
+    for attempt in range(2):
+        s = _new_session()
+        resp = s.get(
+            api_url,
+            headers={
+                "Accept": "application/json",
+                "Referer": case_url,
+            },
+            timeout=20,
+        )
+
+        if _is_waf_blocked(resp):
+            if attempt == 0:
+                _invalidate_and_refresh()
+                continue
+            raise RuntimeError("Register of Actions blocked by WAF after token refresh — run: python -m court.nc.session")
+
+        if resp.status_code != 200:
+            raise RuntimeError(f"Register of Actions API returned {resp.status_code}")
+        break
 
     data = resp.json()
     events = data if isinstance(data, list) else (data.get("registerOfActions") or data.get("events") or [])

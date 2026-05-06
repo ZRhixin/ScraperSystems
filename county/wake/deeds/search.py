@@ -187,48 +187,58 @@ def search_by_book_page(book: str, page: str, fetch_details: bool = False) -> li
     return _do_search(s, payload, 1, fetch_details)
 
 
-def download_document_pdf(doc_id: str, s: requests.Session | None = None) -> bytes:
+def download_document_pdf(doc_id: str, s: requests.Session | None = None) -> tuple[bytes, str]:
     """
-    Download the raw PDF bytes for a document.
+    Download ALL pages of a Wake ROD document and merge into a single PDF.
 
-    Flow (from Burp capture):
-      1. GET /web/document/{doc_id} — detail page HTML contains the servepdf path
-      2. GET /web/document/servepdf/SCALED-{doc_id}.1.pdf/{filename}?index=1 — actual PDF
+    Wake ROD serves each page as a separate single-page PDF via ?index=N.
+    A book/page search may return a document that starts 2-3 pages before
+    the target page (e.g. requesting page 354 returns doc starting at 352).
+    Fetching only index=1 would miss the actual deed on page 3.
 
-    Returns raw PDF bytes.
-    Raises ValueError if no PDF link is found on the detail page.
+    Flow:
+      1. GET /web/document/{doc_id} — extract data-image-name and num_pages
+      2. For each page 1..num_pages: GET document-image-pdf/{doc_id}//{name}-{i}.pdf?index={i}
+      3. Merge all single-page PDFs into one document using pymupdf
     """
+    import fitz
+    from io import BytesIO
+
     if s is None:
         s = _new_session()
 
-    # Step 1: fetch detail page to extract the PDF filename
+    # Step 1: fetch detail page to get filename base and page count
     detail_url = f"{DOCUMENT_URL}/{doc_id}?search={SEARCH_ID}"
     r = s.get(detail_url, headers={"User-Agent": _UA, "Referer": SESSION_URL}, timeout=15)
     r.raise_for_status()
 
-    # The detail page has a div with data-image-name attribute:
-    # <div data-pdf-base-url="/web/document-image-pdfjs/DOCC100471725"
-    #      data-image-name="006511-00265" data-index="1" ...>
-    # Actual PDF URL: /web/document/servepdf/SCALED-{doc_id}.1.pdf/{image_name}.pdf?index=1
     match = re.search(r'data-image-name="([^"]+)"', r.text)
     if not match:
         raise ValueError(f"No data-image-name found in detail page for {doc_id}")
-    image_name = match.group(1)    # e.g. 006511-00265
+    image_name = match.group(1)    # e.g. 000913-00352
 
-    index_match = re.search(r'data-index="([^"]+)"', r.text)
-    index = index_match.group(1) if index_match else "1"
+    detail = _parse_detail(r.text)
+    try:
+        num_pages = max(1, int(detail.get("num_pages") or 1))
+    except (TypeError, ValueError):
+        num_pages = 1
 
-    # Step 2: download the actual PDF
-    # URL pattern from viewer HTML data-href attribute:
-    # /web/document-image-pdf/{doc_id}//{image_name}-{index}.pdf?index={index}
-    pdf_url = f"{BASE_URL}/web/document-image-pdf/{doc_id}//{image_name}-{index}.pdf?index={index}"
-    pdf_resp = s.get(
-        pdf_url,
-        headers={"Referer": detail_url},
-        timeout=30,
-    )
-    pdf_resp.raise_for_status()
-    return pdf_resp.content, pdf_url
+    # Step 2: download each page and merge into a single PDF
+    first_url = f"{BASE_URL}/web/document-image-pdf/{doc_id}//{image_name}-1.pdf?index=1"
+    merged = fitz.open()
+
+    for i in range(1, num_pages + 1):
+        page_url = f"{BASE_URL}/web/document-image-pdf/{doc_id}//{image_name}-{i}.pdf?index={i}"
+        page_resp = s.get(page_url, headers={"Referer": detail_url}, timeout=30)
+        page_resp.raise_for_status()
+        page_doc = fitz.open(stream=page_resp.content, filetype="pdf")
+        merged.insert_pdf(page_doc)
+        page_doc.close()
+
+    buf = BytesIO()
+    merged.save(buf)
+    merged.close()
+    return buf.getvalue(), first_url
 
 
 def get_document(s: requests.Session | None, doc_id: str) -> dict:

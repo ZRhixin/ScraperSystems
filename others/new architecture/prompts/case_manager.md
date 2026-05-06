@@ -12,8 +12,9 @@ These are the descriptions shown to the Case Manager for each sub-agent tool.
 ### Property Researcher
 ```
 Searches the county assessor for property details and writes the result to the database.
-Call this first with the property_id. Returns enriched property data required by all subsequent agents.
-Input: { property_id }
+Call this first with parcel_id and county from the user message.
+Creates the property record and returns the property_id — every subsequent agent needs it.
+Input: { parcel_id, county }
 Output: { property_id, owner, legal_description, last_transfer_date }
 ```
 
@@ -21,9 +22,9 @@ Output: { property_id, owner, legal_description, last_transfer_date }
 ```
 Investigates the full chain of title for a property. Searches deed records, pulls and reads documents,
 checks court records for estate or foreclosure cases, and settles or flags the investigation.
-Call this after Property Researcher. Pass property_id and optionally objections from Senior Partner
-if this is a loopback call.
-Input: { property_id, objections? }
+Call Load Property State first, then pass the full property state to this agent.
+On loopback, also pass objections from Senior Partner.
+Input: { property_id, session_id, county, parcel_id, appraiser_transfer_history, extractions, objections? }
 Output: { session_id, status: "settled" | "flagged_for_review", stop_reason? }
 ```
 
@@ -62,14 +63,20 @@ the outcome of each step before proceeding.
 Run the pipeline in this order:
 
 ### Step 1 — Property Researcher
-Call Property Researcher with the property_id received from the user message.
-It searches the county assessor and enriches the property record in the database.
+Call Property Researcher with the parcel_id and county from the user message.
+It searches the county assessor, creates the property record in the database, and returns a property_id.
 Capture the returned property_id — every subsequent agent needs it.
 
 ### Step 2 — Title Attorney
-Call Title Attorney with the property_id.
-It investigates the full chain of title: pulls deeds, reads documents, checks court records,
-and ends by either settling the chain or flagging for human review.
+Call Load Property State with property_id to fetch the full property record.
+Then call Title Attorney with:
+- property_id
+- session_id (from Load Property State → session.id)
+- county (from Load Property State → property.county)
+- parcel_id (from Load Property State → property.parcel_id)
+- appraiser_transfer_history (from Load Property State)
+- extractions (from Load Property State)
+Title Attorney investigates the full chain of title and ends by settling or flagging.
 Capture the returned status and session_id.
 
 ### Step 3 — Conclusion Writer
@@ -91,9 +98,10 @@ After Senior Partner returns:
   → Pipeline complete. Return final result.
 
 - verdict = "objection_raised" AND this is the first loop
-  → Call Title Attorney again with property_id AND the objections from Senior Partner.
-  → Then call Conclusion Writer again with property_id.
-  → Then call Senior Partner again with the new conclusion_id.
+  → Call Load Property State again with property_id.
+  → Call Title Attorney with the full property state AND objections from Senior Partner.
+  → Call Conclusion Writer with property_id.
+  → Call Senior Partner with the new conclusion_id.
   → Whatever the new verdict is, accept it as final. Do not loop again.
 
 - verdict = "objection_raised" AND this is already the second loop
@@ -137,7 +145,8 @@ When the pipeline completes, return:
 ```
 Investigate this property:
 
-Property ID: {{ $json.property_id }}
+Parcel ID: {{ $json.parcel_id }}
+County: {{ $json.county }}
 ```
 
 ---
@@ -145,8 +154,8 @@ Property ID: {{ $json.property_id }}
 ## Notes
 
 - The user message is sent by n8n from the webhook payload.
-- `property_id` is the only required input to start the pipeline.
-- The Case Manager handles all sequencing — the webhook caller only needs to send this one field
-  and wait for the final output.
+- The webhook only needs `parcel_id` and `county` — no property_id required.
+- `property_id` is created by Property Researcher (via Scout Write) and captured from its output.
+  All subsequent agents receive it from the Case Manager, not from the webhook.
 - Loop count tracking: the Case Manager must remember how many times it has called Title Attorney
   within the same run. Stop at 2 calls total.

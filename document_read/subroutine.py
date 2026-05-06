@@ -52,9 +52,10 @@ def read_document(
     try:
         cur = dict_cursor(conn)
         cur.execute(f"SELECT * FROM {capture_table} WHERE id = %s", (capture_id,))
-        capture = dict(cur.fetchone())
-        if not capture:
+        row = cur.fetchone()
+        if row is None:
             raise ValueError(f"No row found in {capture_table} with id={capture_id}")
+        capture = dict(row)
 
         # Download PDF if not already stored
         pdf_bytes = _get_pdf_bytes(capture, capture_id, capture_table, conn)

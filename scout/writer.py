@@ -47,8 +47,8 @@ def write(data: dict) -> dict:
     if not parcel_id or not county:
         raise ValueError("parcel_id and county are required")
 
-    addr       = data.get("property_address") or {}
-    parsed     = data.get("short_legal_parsed") or {}
+    addr       = _coerce_dict(data.get("property_address"))
+    parsed     = _coerce_dict(data.get("short_legal_parsed"))
     last_sale  = _parse_date(data.get("last_sale_date"))
 
     conn = get_conn()
@@ -108,7 +108,7 @@ def write(data: dict) -> dict:
                 _full_address(addr), addr.get("street"), addr.get("city"),
                 addr.get("state"), addr.get("zip"),
                 data.get("secondary_parcel_id"),
-                json.dumps(data.get("current_owners") or []),
+                json.dumps(_coerce_list(data.get("current_owners"))),
                 data.get("short_legal_raw"),
                 parsed.get("subdivision"), parsed.get("block"), parsed.get("lot"),
                 data.get("plat_book"), data.get("plat_page"),
@@ -123,7 +123,7 @@ def write(data: dict) -> dict:
         created     = row[1]
 
         # Insert transfer history — skip rows with no book/page AND no instrument_number
-        transfers = data.get("transfer_history") or []
+        transfers = _coerce_list(data.get("transfer_history"))
         inserted  = 0
 
         for t in transfers:
@@ -179,6 +179,32 @@ def write(data: dict) -> dict:
         raise
     finally:
         conn.close()
+
+
+def _coerce_dict(value) -> dict:
+    """Return a dict — parse JSON string if needed, fall back to {}."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return {}
+
+
+def _coerce_list(value) -> list:
+    """Return a list — parse JSON string if needed, fall back to []."""
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
 
 
 def _full_address(addr: dict) -> str | None:
