@@ -127,18 +127,18 @@ def _get(session: requests.Session, url: str, headers: dict, cookies: dict) -> N
     path = url.replace(BASE_URL, "")
     try:
         resp = session.get(url, headers=headers, cookies=cookies, timeout=10, verify=False)
-        print(f"  GET  {path} → {resp.status_code}")
+        print(f"  GET  {path} -> {resp.status_code}")
     except Exception as e:
-        print(f"  GET  {path} → ERROR: {e}")
+        print(f"  GET  {path} -> ERROR: {e}")
 
 
 def _post(session: requests.Session, url: str, data: dict, headers: dict, cookies: dict) -> None:
     path = url.replace(BASE_URL, "")
     try:
         resp = session.post(url, data=data, headers=headers, cookies=cookies, timeout=10, verify=False)
-        print(f"  POST {path} → {resp.status_code}")
+        print(f"  POST {path} -> {resp.status_code}")
     except Exception as e:
-        print(f"  POST {path} → ERROR: {e}")
+        print(f"  POST {path} -> ERROR: {e}")
 
 
 def _pause(min_s: float, max_s: float) -> None:
