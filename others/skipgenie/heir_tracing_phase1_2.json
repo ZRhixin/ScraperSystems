@@ -1,0 +1,785 @@
+{
+  "name": "Heir Tracing — Phases 1, 2 & 4",
+  "nodes": [
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heir-trace/start",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "heir-trace-start"
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  cc.id AS conclusion_id,\n  cc.property_id,\n  cc.flags,\n  cc.current_owners,\n  s.stop_reason\nFROM chain_conclusions cc\nLEFT JOIN investigation_sessions s\n  ON s.property_id = cc.property_id\n  AND s.id = {{ $('Webhook').item.json.body.session_id }}\nWHERE cc.id = {{ $('Webhook').item.json.body.conclusion_id }}\nLIMIT 1",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000002",
+      "name": "Postgres: Load Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [280, 80],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_NEON_CREDENTIAL_ID",
+          "name": "Neon DB"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Search for this deceased property owner using SkipGenie.\nWe already know they are deceased — we need their DOD, relatives, and any contact fragments.\n\nName: {{ $('Webhook').item.json.body.deceased_owner }}\nState: {{ $('Webhook').item.json.body.last_known_state }}\nCounty: {{ $('Webhook').item.json.body.last_known_county }}\nApproximate death year: {{ $('Webhook').item.json.body.approx_death_year }}",
+        "options": {
+          "systemMessage": "You are the Skip Tracer. Your job is to search for a person using SkipGenie and return their death status, contact information, and relatives.\n\n---\n\n## Steps\n\n1. Split the name into first and last name. Call SkipGenie Search with first name, last name, and state.\n\n2. Verify the result is the right person:\n   - If the expected_relationship gives a birth decade (e.g., child of someone born ~1920 means they should be roughly 60-100 years old today), check SkipGenie's age field\n   - If age is more than 20 years off from expected: flag as unverified — may be wrong person\n   - If location (state) is very different: flag as suspicious but don't reject outright\n\n3. If SkipGenie returns no result: return no_result = true. Do not retry with variations.\n\n---\n\n## Output\n\nReturn exactly this JSON — no markdown, no prose:\n\n{\n  \"subject_name\":        \"<SkipGenie subject_name, or input name if no result>\",\n  \"is_deceased\":         <true | false>,\n  \"dod\":                 \"<YYYY-MM-DD or empty string>\",\n  \"age\":                 \"<age string from SkipGenie or empty>\",\n  \"phones\":              [\"<number>\"],\n  \"emails\":              [\"<email>\"],\n  \"best_address\":        \"<most recent full address as single string, or empty>\",\n  \"possible_relatives\":  [\n    { \"name\": \"<name>\", \"age\": \"<age>\", \"deceased\": \"<empty or DECEASED>\", \"pid\": \"<id>\" }\n  ],\n  \"verified\":            <true if age and location look right, false if mismatch>,\n  \"no_result\":           <true if SkipGenie returned nothing, false otherwise>,\n  \"gaps\":                [\"<any concerns — wrong person suspected, no result, etc.>\"]\n}"
+        },
+        "maxIterations": 5
+      },
+      "id": "a1000001-0000-0000-0000-000000000003",
+      "name": "Skip Tracer: Root Owner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [280, 300]
+    },
+
+    {
+      "parameters": {
+        "model": "claude-haiku-4-5-20251001",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000004",
+      "name": "Skip Tracer Root: Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [160, 520],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "name": "skipgenie_search",
+        "description": "Calls the SkipGenie API to search for a person by name and state. Returns deceased flag, DOD, addresses, phones, emails, and possible_relatives. Returns only the first/best match — verify the result is the right person. Input: { first_name, last_name, state }",
+        "method": "POST",
+        "url": "http://127.0.0.1:8001",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "first_name",
+              "value": "={{ $fromAI('first_name', 'First name of person to search') }}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{ $fromAI('last_name', 'Last name of person to search') }}"
+            },
+            {
+              "name": "state",
+              "value": "={{ $fromAI('state', 'Two-letter US state code, e.g. NC') }}"
+            }
+          ]
+        }
+      },
+      "id": "a1000001-0000-0000-0000-000000000005",
+      "name": "SkipGenie Search: Root",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [360, 520]
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Verify this person's deceased status and collect evidence.\n\nName: {{ $('Webhook').item.json.body.deceased_owner }}\nState: {{ $('Webhook').item.json.body.last_known_state }}\nCounty: {{ $('Webhook').item.json.body.last_known_county }}\nApproximate death year: {{ $('Webhook').item.json.body.approx_death_year }}\nSkipGenie claim: deceased\nSkipGenie DOD: unknown at this stage\nSkipGenie relatives: unknown at this stage\n\nThis person is confirmed deceased by the Phase D trigger (estate_path_unresolved = true).\nRun the deceased path: search for obituary first (Tier 1). If not found, run SSDI check if available.\nExtract survivors list from obituary — this tells us who was alive when they died.",
+        "options": {
+          "systemMessage": "You are the Verification Agent. Your job is to verify whether a person is alive or deceased by searching for their obituary.\n\nYou have a web search tool. Use it to search for the person's obituary.\n\n---\n\n## Obituary Search\n\nSearch query: `\"[first] [last]\" obituary [state]`\n- Default: use mailing address city if known\n- If no results with city: try without city, or use property county\n- Try up to 3 different query variations before giving up\n\nFor each result found, cross-check against SkipGenie data:\n- Birth year matches? (SkipGenie age → approximate birth year → compare to obituary birth year)\n- Relatives/survivors overlap with SkipGenie possible_relatives?\n\n| Match | Confidence | Decision |\n|---|---|---|\n| Both birth year AND relatives match | high | CONFIRMED — extract data, stop |\n| Only one of the two matches | medium | CONFIRMED (flag) — extract data, stop |\n| Neither matches | low | Wrong person — discard, try next result |\n\n**Spouse backdoor (when applicable):**\nIf target person's obituary cannot be found directly, AND a spouse appears in SkipGenie possible_relatives: search for the spouse's obituary.\nScan the spouse's obituary for the target appearing as:\n- \"preceded in death by [name]\"\n- \"survived by [name]\" (confirms they were alive at spouse's death — use carefully)\n\n**If no obituary found:**\nReturn verification_result = \"unverified_deceased\" with a note. The cascade proceeds.\n\n---\n\n## For ALIVE PATH (SkipGenie says alive)\n\nSearch for obituary. If obituary found AND it matches (high or medium confidence): CONFLICT.\nIf no obituary found: return verification_result = \"confirmed_alive\".\n\n---\n\n## Extract From Obituary When Found\n\nExtract:\n- DOD (explicit date if stated)\n- Marital status at death (\"survived by husband/wife\" → married; \"preceded in death by spouse\" → widowed)\n- Survivors list: everyone named in \"survived by\" section with their relationship\n- Note: \"preceded in death by\" means that person ALSO died before the subject\n\n---\n\n## Output\n\nReturn exactly this JSON — no markdown, no prose:\n\n{\n  \"skipgenie_claim\":           \"deceased | alive\",\n  \"verification_result\":       \"confirmed_alive | confirmed_deceased | unverified_deceased | conflict\",\n  \"supporting_document\":       \"obituary | obituary_spouse_backdoor | null\",\n  \"dod\":                       \"<YYYY-MM-DD or approximate year, or null>\",\n  \"dod_source\":                \"obituary | skipgenie | null\",\n  \"obituary_searched\":         <true | false>,\n  \"obituary_found\":            <true | false>,\n  \"obituary_url\":              \"<URL or null>\",\n  \"obituary_snippet\":          \"<brief quote from obituary or null>\",\n  \"obituary_match_confidence\": \"high | medium | low | null\",\n  \"obituary_birth_year_match\": <true | false | null>,\n  \"obituary_relatives_match\":  <true | false | null>,\n  \"found_via_spouse_search\":   <true | false>,\n  \"spouse_searched\":           \"<spouse name if used, or null>\",\n  \"marital_status_at_death\":   \"married | widowed | unknown | null\",\n  \"survivors_from_obituary\":   [\n    { \"name\": \"<name>\", \"relationship\": \"<child | spouse | sibling | parent | grandchild | other>\" }\n  ],\n  \"note\":                      \"<any important notes, especially for conflict or unverified cases, or null>\"\n}"
+        },
+        "maxIterations": 10
+      },
+      "id": "a1000001-0000-0000-0000-000000000006",
+      "name": "Verification Agent: Root Owner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [280, 560]
+    },
+
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000007",
+      "name": "Verification Root: Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [160, 780],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+
+    {
+      "parameters": {},
+      "id": "a1000001-0000-0000-0000-000000000008",
+      "name": "Web Search: Root",
+      "type": "@n8n/n8n-nodes-langchain.toolSerpApi",
+      "typeVersion": 1,
+      "position": [360, 780],
+      "credentials": {
+        "serpApi": {
+          "id": "REPLACE_WITH_SERPAPI_CREDENTIAL_ID",
+          "name": "SerpAPI"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000009",
+      "name": "Merge A: Phase 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [560, 180]
+    },
+
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000009b",
+      "name": "Merge B: Phase 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [700, 300]
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Determine the heirs of this deceased property owner.\n\nDecedent: {{ $('Webhook').item.json.body.deceased_owner }}\nState: {{ $('Webhook').item.json.body.last_known_state }}\nApproximate death year: {{ $('Webhook').item.json.body.approx_death_year }}\nEstate type: {{ $('Webhook').item.json.body.estate_path_status === 'unknown_check_court_records' ? 'UNKNOWN — run court_search first to determine if a will or estate was filed before applying succession rules' : 'intestate (confirmed by Phase D — estate_path_unresolved = true)' }}\nParent share pct: {{ $('Webhook').item.json.body.parent_share_pct ?? 100 }}\n\nSkipGenie search result:\n{{ $('Skip Tracer: Root Owner').item.json.output }}\n\nVerification evidence (obituary survivors list, DOD):\n{{ $('Verification Agent: Root Owner').item.json.output }}\n\nPhase D investigation stop reason:\n{{ $('Postgres: Load Context').item.json.stop_reason ?? 'Not available' }}\n\nApply NC Chapter 29. Use survivors from obituary as the primary relatives source.\nFall back to SkipGenie possible_relatives if obituary has no survivors list.\nIf testacy status is unclear, use the court_search tool to check for probate or estate cases.",
+        "options": {
+          "systemMessage": "You are the Estate Analyst. Your job is to determine who inherits a deceased person's property interest, and in what fractional shares.\n\nYou have one external tool: court_search. Use it when testacy status (intestate vs testate) is unclear — search for probate or estate cases filed for the decedent.\n- If court search returns an open estate or probate case: set path = testate and extract will directives if visible.\n- If court search returns nothing: proceed as intestate.\n\nFor most cases, reason from the information provided and NC law below.\n\n---\n\n## Path A — Intestate (Chapter 29)\n\nUse when estate_type = \"intestate\".\n\n### Relatives Source Priority\n1. survivors_from_obituary — \"survived by\" list is the most accurate (names people alive at death)\n2. SkipGenie possible_relatives — fallback if no obituary\n3. approx_death_year context — helps estimate if relatives could be alive\n\n### NC Chapter 29 Priority Order\n\nSTEP 1 — Surviving Spouse (GS 29-14)\n\nReal property rule (we always deal in real property):\n  With children:    spouse gets 1/3, children split 2/3 per stirpes\n  Without children: spouse gets 1/2, remainder to parents; if no parents, spouse takes all\n\nDollar threshold note (personal property only — not applicable to real property):\n  Pre-Oct 2012: $30K (with children) / $50K (without children) first\n  Post-Oct 2012: $60K (with children) / $100K (without children) first\n\nSTEP 2 — Children and Descendants (GS 29-15 Priority 1)\n  All living children share equally.\n  Child predeceased the decedent → per stirpes to their children.\n  Child survived the decedent but died later → their share passes through THEIR estate.\n  Do NOT apply per stirpes to a child who survived the decedent. That share must cascade.\n\nSTEP 3 — Parents (Priority 2)\n  No spouse, no children, no descendants alive.\n  Both parents: split equally. One parent: takes all.\n\nSTEP 4 — Siblings and their descendants (Priority 3)\n  No spouse, no children, no parents.\n  Living siblings share equally. Deceased sibling's share → their children per stirpes.\n\nSTEP 5 — Grandparents / Aunts / Uncles (Priority 4)\n  Paternal line first, then maternal line.\n\nSTEP 6 — Collateral relatives to 5th degree (Priority 5)\n\nSTEP 7 — Escheat to NC State\n\n### Calculating Sub-Shares\nparent_share_pct is the total to divide at this level.\nExample: parent_share_pct = 100, 2 children → each child gets 50.0\nExample: parent_share_pct = 100, spouse + 2 children (real property) →\n  spouse: 100 × 1/3 = 33.33, each child: 100 × 2/3 ÷ 2 = 33.33\n\nIMPORTANT: Do NOT apply per stirpes to heirs who survived the decedent and died later. Mark them with is_deceased_cascade: true — their share will be traced separately in the cascade phase.\n\n---\n\n## Path B — Testate (Will-Directed)\n\nUse when estate_type = \"testate\".\n\nRead will_directives_summary:\n- Who was named beneficiary for real property?\n- What fractional share or specific bequest?\n- Is a trust named? → log as gap: \"Trust beneficiary — further research needed\"\n\nThe will beneficiary gets the ENTIRE parent_share_pct.\nChapter 29 does NOT apply. Family relationships are irrelevant unless named in the will.\nBeneficiary can be anyone: friend, charity, non-relative, trust.\n\nIf will_directives_summary is empty or unclear:\n- Log gap: \"Will found but directives unclear — manual review needed\"\n- Set path = \"unknown\", return empty heirs list\n\n---\n\n## Output\n\nReturn exactly this JSON — no markdown, no prose:\n\n{\n  \"path\": \"intestate | testate | unknown\",\n  \"statute_applied\": \"<e.g. GS 29-15 Priority 1 — child of decedent, or Will of [name] dated [date]>\",\n  \"heirs\": [\n    {\n      \"name\":                  \"<heir name>\",\n      \"relationship\":          \"<child | spouse | parent | sibling | beneficiary | etc.>\",\n      \"share_pct\":             <float>,\n      \"share_fraction\":        \"<e.g. 1/2 or 1/4>\",\n      \"basis\":                 \"<brief explanation>\",\n      \"is_deceased_cascade\":   <true if this heir survived decedent but is known deceased — needs cascade; false if living or unknown>\n    }\n  ],\n  \"gaps\": [\"<any ambiguities>\"]\n}"
+        },
+        "maxIterations": 10
+      },
+      "id": "a1000001-0000-0000-0000-000000000010",
+      "name": "Estate Analyst: Root Owner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [920, 300]
+    },
+
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000011",
+      "name": "Estate Analyst Root: Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [820, 520],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const agentOutput = $input.first().json.output || '';\n\nlet estateResult;\ntry {\n  const match = agentOutput.match(/\\{[\\s\\S]*\\}/);\n  if (!match) throw new Error('No JSON found in agent output');\n  estateResult = JSON.parse(match[0]);\n} catch (e) {\n  return [{\n    json: {\n      heirs: [],\n      gaps: ['PARSE ERROR on Estate Analyst root output: ' + agentOutput.substring(0, 300)],\n      error: true\n    }\n  }];\n}\n\nconst webhookBody = $('Webhook').first().json.body;\n\nconst heirs = (estateResult.heirs || []).map(h => ({\n  name:                h.name,\n  relationship:        h.relationship,\n  share_pct:           h.share_pct,\n  share_fraction:      h.share_fraction,\n  basis:               h.basis,\n  is_deceased_cascade: h.is_deceased_cascade || false,\n  state:               webhookBody.last_known_state,\n  county:              webhookBody.last_known_county,\n  property_id:         webhookBody.property_id,\n  conclusion_id:       webhookBody.conclusion_id,\n  root_decedent:       webhookBody.deceased_owner\n}));\n\nreturn heirs.map(h => ({ json: h }));",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-000000000012",
+      "name": "Code: Parse Heir List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 300]
+    },
+
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "a1000001-0000-0000-0000-000000000013",
+      "name": "Split In Batches: Level-1 Heirs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1440, 300]
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Search for this person using SkipGenie.\n\nName: {{ $json.name }}\nState: {{ $json.state }}\nExpected relationship: {{ $json.relationship }} of {{ $json.root_decedent }}\nShare: {{ $json.share_pct }}%",
+        "options": {
+          "systemMessage": "You are the Skip Tracer. Your job is to search for a person using SkipGenie and return their death status, contact information, and relatives.\n\n---\n\n## Steps\n\n1. Split the name into first and last name. Call SkipGenie Search with first name, last name, and state.\n\n2. Verify the result is the right person:\n   - If the expected_relationship gives a birth decade (e.g., child of someone born ~1920 means they should be roughly 60-100 years old today), check SkipGenie's age field\n   - If age is more than 20 years off from expected: flag as unverified — may be wrong person\n   - If location (state) is very different: flag as suspicious but don't reject outright\n\n3. If SkipGenie returns no result: return no_result = true. Do not retry with variations.\n\n---\n\n## Output\n\nReturn exactly this JSON — no markdown, no prose:\n\n{\n  \"subject_name\":        \"<SkipGenie subject_name, or input name if no result>\",\n  \"is_deceased\":         <true | false>,\n  \"dod\":                 \"<YYYY-MM-DD or empty string>\",\n  \"age\":                 \"<age string from SkipGenie or empty>\",\n  \"phones\":              [\"<number>\"],\n  \"emails\":              [\"<email>\"],\n  \"best_address\":        \"<most recent full address as single string, or empty>\",\n  \"possible_relatives\":  [\n    { \"name\": \"<name>\", \"age\": \"<age>\", \"deceased\": \"<empty or DECEASED>\", \"pid\": \"<id>\" }\n  ],\n  \"verified\":            <true if age and location look right, false if mismatch>,\n  \"no_result\":           <true if SkipGenie returned nothing, false otherwise>,\n  \"gaps\":                [\"<any concerns — wrong person suspected, no result, etc.>\"]\n}"
+        },
+        "maxIterations": 5
+      },
+      "id": "a1000001-0000-0000-0000-000000000014",
+      "name": "Skip Tracer: Per Heir",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1680, 300]
+    },
+
+    {
+      "parameters": {
+        "model": "claude-haiku-4-5-20251001",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000015",
+      "name": "Skip Tracer Per Heir: Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1560, 520],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "name": "skipgenie_search",
+        "description": "Calls the SkipGenie API to search for a person by name and state. Returns deceased flag, DOD, addresses, phones, emails, and possible_relatives. Returns only the first/best match — verify the result is the right person. Input: { first_name, last_name, state }",
+        "method": "POST",
+        "url": "http://127.0.0.1:8001",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "first_name",
+              "value": "={{ $fromAI('first_name', 'First name of person to search') }}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{ $fromAI('last_name', 'Last name of person to search') }}"
+            },
+            {
+              "name": "state",
+              "value": "={{ $fromAI('state', 'Two-letter US state code, e.g. NC') }}"
+            }
+          ]
+        }
+      },
+      "id": "a1000001-0000-0000-0000-000000000016",
+      "name": "SkipGenie Search: Per Heir",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1760, 520]
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Verify this person's status (alive or deceased).\n\nName: {{ $json.name }}\nState: {{ $json.state }}\nExpected relationship: {{ $json.relationship }} of {{ $json.root_decedent }}\n\nSkipGenie result:\n{{ $('Skip Tracer: Per Heir').item.json.output }}\n\nRun the two-layer waterfall for the SkipGenie claim (alive or deceased).",
+        "options": {
+          "systemMessage": "You are the Verification Agent. Your job is to verify whether a person is alive or deceased by searching for their obituary.\n\nYou have a web search tool. Use it to search for the person's obituary.\n\n---\n\n## Obituary Search\n\nSearch query: `\"[first] [last]\" obituary [state]`\n- Default: use mailing address city if known\n- If no results with city: try without city, or use property county\n- Try up to 3 different query variations before giving up\n\nFor each result found, cross-check against SkipGenie data:\n- Birth year matches? (SkipGenie age → approximate birth year → compare to obituary birth year)\n- Relatives/survivors overlap with SkipGenie possible_relatives?\n\n| Match | Confidence | Decision |\n|---|---|---|\n| Both birth year AND relatives match | high | CONFIRMED — extract data, stop |\n| Only one of the two matches | medium | CONFIRMED (flag) — extract data, stop |\n| Neither matches | low | Wrong person — discard, try next result |\n\n**Spouse backdoor (when applicable):**\nIf target person's obituary cannot be found directly, AND a spouse appears in SkipGenie possible_relatives: search for the spouse's obituary.\nScan the spouse's obituary for the target appearing as:\n- \"preceded in death by [name]\"\n- \"survived by [name]\" (confirms they were alive at spouse's death — use carefully)\n\n**If no obituary found:**\nReturn verification_result = \"unverified_deceased\" with a note. The cascade proceeds.\n\n---\n\n## For ALIVE PATH (SkipGenie says alive)\n\nSearch for obituary. If obituary found AND it matches (high or medium confidence): CONFLICT.\nIf no obituary found: return verification_result = \"confirmed_alive\".\n\n---\n\n## Extract From Obituary When Found\n\nExtract:\n- DOD (explicit date if stated)\n- Marital status at death (\"survived by husband/wife\" → married; \"preceded in death by spouse\" → widowed)\n- Survivors list: everyone named in \"survived by\" section with their relationship\n- Note: \"preceded in death by\" means that person ALSO died before the subject\n\n---\n\n## Output\n\nReturn exactly this JSON — no markdown, no prose:\n\n{\n  \"skipgenie_claim\":           \"deceased | alive\",\n  \"verification_result\":       \"confirmed_alive | confirmed_deceased | unverified_deceased | conflict\",\n  \"supporting_document\":       \"obituary | obituary_spouse_backdoor | null\",\n  \"dod\":                       \"<YYYY-MM-DD or approximate year, or null>\",\n  \"dod_source\":                \"obituary | skipgenie | null\",\n  \"obituary_searched\":         <true | false>,\n  \"obituary_found\":            <true | false>,\n  \"obituary_url\":              \"<URL or null>\",\n  \"obituary_snippet\":          \"<brief quote from obituary or null>\",\n  \"obituary_match_confidence\": \"high | medium | low | null\",\n  \"obituary_birth_year_match\": <true | false | null>,\n  \"obituary_relatives_match\":  <true | false | null>,\n  \"found_via_spouse_search\":   <true | false>,\n  \"spouse_searched\":           \"<spouse name if used, or null>\",\n  \"marital_status_at_death\":   \"married | widowed | unknown | null\",\n  \"survivors_from_obituary\":   [\n    { \"name\": \"<name>\", \"relationship\": \"<child | spouse | sibling | parent | grandchild | other>\" }\n  ],\n  \"note\":                      \"<any important notes, especially for conflict or unverified cases, or null>\"\n}"
+        },
+        "maxIterations": 10
+      },
+      "id": "a1000001-0000-0000-0000-000000000017",
+      "name": "Verification Agent: Per Heir",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1920, 300]
+    },
+
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000018",
+      "name": "Verification Per Heir: Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1800, 520],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+
+    {
+      "parameters": {},
+      "id": "a1000001-0000-0000-0000-000000000019",
+      "name": "Web Search: Per Heir",
+      "type": "@n8n/n8n-nodes-langchain.toolSerpApi",
+      "typeVersion": 1,
+      "position": [2000, 520],
+      "credentials": {
+        "serpApi": {
+          "id": "REPLACE_WITH_SERPAPI_CREDENTIAL_ID",
+          "name": "SerpAPI"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const heirData = $json;\nconst skipOutput  = $('Skip Tracer: Per Heir').item.json.output  || '';\nconst verifOutput = $('Verification Agent: Per Heir').item.json.output || '';\n\nlet skipResult = {};\ntry {\n  const m = skipOutput.match(/\\{[\\s\\S]*\\}/);\n  if (m) skipResult = JSON.parse(m[0]);\n} catch (_) {}\n\nlet verifResult = {};\ntry {\n  const m = verifOutput.match(/\\{[\\s\\S]*\\}/);\n  if (m) verifResult = JSON.parse(m[0]);\n} catch (_) {}\n\nconst verificationResult = verifResult.verification_result || 'unverified_deceased';\n\nconst base = {\n  name:                heirData.name,\n  relationship:        heirData.relationship,\n  share_pct:           heirData.share_pct,\n  share_fraction:      heirData.share_fraction,\n  basis:               heirData.basis,\n  is_deceased_cascade: heirData.is_deceased_cascade || false,\n  state:               heirData.state,\n  county:              heirData.county || '',\n  property_id:         heirData.property_id,\n  conclusion_id:       heirData.conclusion_id,\n  root_decedent:       heirData.root_decedent,\n  skipgenie_result:    skipResult,\n  verification:        verifResult,\n  verification_result: verificationResult\n};\n\nif (verificationResult === 'confirmed_alive') {\n  return [{ json: {\n    ...base,\n    category:     'living',\n    phones:       skipResult.phones       || [],\n    emails:       skipResult.emails       || [],\n    best_address: skipResult.best_address || ''\n  } }];\n}\n\nif (verificationResult === 'conflict') {\n  return [{ json: {\n    ...base,\n    category: 'conflict',\n    gap: `CONFLICT for ${heirData.name}: ${verifResult.note || 'SkipGenie and verification layers disagree'}`\n  } }];\n}\n\nreturn [{ json: {\n  ...base,\n  category:  'deceased',\n  dod:       verifResult.dod || skipResult.dod || '',\n  relatives: skipResult.possible_relatives || []\n} }];",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-000000000020",
+      "name": "Code: Route + Accumulate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2180, 300]
+    },
+
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000021",
+      "name": "Merge: Level-1 Complete",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2420, 300]
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map(i => i.json);\n\nconst living_heirs    = [];\nconst deceased_queue  = [];\nconst gaps            = [];\nlet   credits_used    = 0;\n\nfor (const item of items) {\n  if (item.category === 'living') {\n    living_heirs.push({\n      name:              item.name,\n      relationship_path: `${item.relationship} of ${item.root_decedent}`,\n      share_pct:         item.share_pct,\n      share_fraction:    item.share_fraction,\n      is_alive:          true,\n      estate_path:       `intestate from ${item.root_decedent}`,\n      phones:            item.phones        || [],\n      emails:            item.emails        || [],\n      best_address:      item.best_address  || '',\n      contact_status:    'not_contacted',\n      verification:      item.verification\n    });\n  } else if (item.category === 'deceased') {\n    deceased_queue.push(item);\n  } else if (item.category === 'conflict') {\n    gaps.push(item.gap);\n  }\n  if (item.skipgenie_result && !item.skipgenie_result.no_result) {\n    credits_used++;\n  }\n}\n\nconst webhookBody = $('Webhook').first().json.body;\n\nreturn [{\n  json: {\n    living_heirs,\n    deceased_queue,\n    gaps,\n    credits_used,\n    root_decedent:  webhookBody.deceased_owner,\n    property_id:    webhookBody.property_id,\n    conclusion_id:  webhookBody.conclusion_id,\n    ancestor_names: [webhookBody.deceased_owner, ...deceased_queue.map(d => d.name)]\n  }\n}];",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-000000000022",
+      "name": "Code: Separate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2660, 300]
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-any-deceased",
+              "leftValue": "={{ $json.deceased_queue.length }}",
+              "rightValue": 0,
+              "operator": {
+                "name": "filter.operator.gt",
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000023",
+      "name": "IF: Any Deceased Heirs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2900, 300]
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Accepts input from either:\n// (a) Code: Cascade Deceased Heirs (TRUE path) — already has deceased_in_chain built\n// (b) Merge: Pre-Compiler FALSE path — has deceased_queue (empty, no cascade needed)\n\nconst living_heirs = $json.living_heirs || [];\nconst gaps         = $json.gaps         || [];\n\nconst deceased_in_chain = ($json.deceased_in_chain !== undefined)\n  ? $json.deceased_in_chain\n  : ($json.deceased_queue || []).map(d => ({\n      name:              d.name,\n      relationship_path: `${d.relationship} of ${d.root_decedent}`,\n      share_pct:         d.share_pct,\n      share_fraction:    d.share_fraction,\n      dod:               d.dod || null,\n      estate_type:       null,\n      cascaded_to:       [],\n      evidence:          d.verification || {}\n    }));\n\nreturn [{\n  json: {\n    living_heirs,\n    deceased_in_chain,\n    gaps,\n    credits_used:  $json.credits_used  || 0,\n    root_decedent: $json.root_decedent,\n    property_id:   $json.property_id,\n    conclusion_id: $json.conclusion_id\n  }\n}];",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-000000000024",
+      "name": "Code: Build Compiler Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3160, 420]
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Compile the final heir tree for this property.\n\nRoot decedent: {{ $json.root_decedent }}\nProperty ID: {{ $json.property_id }}\nConclusion ID: {{ $json.conclusion_id }}\n\nLiving heirs:\n{{ JSON.stringify($json.living_heirs, null, 2) }}\n\nDeceased in chain:\n{{ JSON.stringify($json.deceased_in_chain, null, 2) }}\n\nExisting gaps:\n{{ JSON.stringify($json.gaps, null, 2) }}\n\nCredits used: {{ $json.credits_used }}\n\nValidate all shares, check contact completeness, and produce the final heir tree output.",
+        "options": {
+          "systemMessage": "You are the Heir Tree Compiler. You take all heir research results and assemble them into the final, validated heir tree.\n\nYou have NO external tools. All input comes from the workflow data.\n\n---\n\n## Validation Rules\n\n### 1 — Share Sum\nSum all share_pct values across living_heirs only. Must equal 100.0 (allow ±0.01 for rounding).\nIf sum ≠ 100: add gap \"Share sum = X.XX% — rounding discrepancy of Y.YY%\".\nDo NOT adjust shares — flag and report as-is.\n\n### 2 — Cascade Completeness\nFor each entry in deceased_in_chain:\n- If cascaded_to is non-empty: normal.\n- If cascaded_to is empty AND deceased_in_chain is non-empty: add gap \"[name] — cascade not resolved. Phase 3 cascade required.\"\n- If deceased_in_chain is empty: no cascade gap — this is a clean all-living result.\n\n### 3 — Contact Completeness\nFor each living heir: if phones is empty AND emails is empty AND best_address is empty:\n  Add gap \"[name] — no contact information found\".\n\n---\n\n## Status Rules\n- \"complete\": no gaps and shares sum to 100 and (deceased_in_chain is empty OR all cascaded_to are non-empty)\n- \"manual_review\": any conflict in existing gaps, OR shares don't sum to 100\n- \"partial\": any deceased_in_chain entry has empty cascaded_to (cascade unresolved)\n\nFor an all-living run (deceased_in_chain is empty): status = \"complete\" if no other gaps.\n\n---\n\n## Output\n\nReturn exactly this JSON — no markdown, no prose, no explanation:\n\n{\n  \"property_id\":        <number>,\n  \"conclusion_id\":      <number>,\n  \"root_decedent\":      \"<root_decedent name>\",\n  \"total_living_heirs\": <count of living_heirs>,\n  \"living_heirs\": [\n    {\n      \"name\":              \"<name>\",\n      \"relationship_path\": \"<e.g. child of Lydia Hayes>\",\n      \"share_pct\":         <float>,\n      \"share_fraction\":    \"<e.g. 1/2>\",\n      \"is_alive\":          true,\n      \"estate_path\":       \"<e.g. intestate from Lydia Hayes — GS 29-15 Priority 1>\",\n      \"phones\":            [\"<number>\"],\n      \"emails\":            [\"<email>\"],\n      \"best_address\":      \"<address>\",\n      \"contact_status\":    \"not_contacted\",\n      \"verification\":      <verification evidence object or null>\n    }\n  ],\n  \"deceased_in_chain\": [\n    {\n      \"name\":              \"<name>\",\n      \"relationship_path\": \"<path>\",\n      \"share_pct\":         <float>,\n      \"dod\":               \"<date or null>\",\n      \"estate_type\":       \"intestate | testate | null\",\n      \"cascaded_to\":       [\"<sub-heir names>\"],\n      \"evidence\":          <verification evidence object or null>\n    }\n  ],\n  \"gaps\":         [\"<gap descriptions>\"],\n  \"credits_used\": <number>,\n  \"status\":       \"complete | manual_review | partial\"\n}"
+        },
+        "maxIterations": 5
+      },
+      "id": "a1000001-0000-0000-0000-000000000025",
+      "name": "Heir Tree Compiler",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [3420, 420]
+    },
+
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000026",
+      "name": "Heir Tree Compiler: Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [3300, 640],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const output = $input.first().json.output || '';\n\nlet compiled;\ntry {\n  const match = output.match(/\\{[\\s\\S]*\\}/);\n  if (!match) throw new Error('No JSON found in compiler output');\n  compiled = JSON.parse(match[0]);\n} catch (e) {\n  const ctx = $('Code: Build Compiler Input').first().json;\n  return [{\n    json: {\n      error:        true,\n      parse_error:  e.message,\n      raw_output:   output.substring(0, 500),\n      status:       'parse_error',\n      property_id:  ctx.property_id,\n      conclusion_id: ctx.conclusion_id,\n      root_decedent: ctx.root_decedent,\n      total_living_heirs: 0,\n      living_heirs:  [],\n      deceased_in_chain: [],\n      gaps:          ['PARSE ERROR in Heir Tree Compiler output'],\n      credits_used:  ctx.credits_used || 0\n    }\n  }];\n}\n\nreturn [{ json: compiled }];",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-000000000027",
+      "name": "Code: Parse Compiler Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3680, 420]
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO heir_traces (\n  property_id,\n  conclusion_id,\n  root_decedent_name,\n  heir_tree,\n  living_heir_count,\n  total_credits_used,\n  status,\n  gaps\n) VALUES (\n  {{ $json.property_id }},\n  {{ $json.conclusion_id }},\n  '{{ ($json.root_decedent || \"\").replace(/'/g, \"''\") }}',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  {{ $json.total_living_heirs ?? 0 }},\n  {{ $json.credits_used ?? 0 }},\n  '{{ ($json.status || \"draft\").replace(/'/g, \"''\") }}',\n  '{{ JSON.stringify($json.gaps || []) }}'::jsonb\n)\nRETURNING id",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-000000000028",
+      "name": "Postgres: Write heir_traces",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3940, 420],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_NEON_CREDENTIAL_ID",
+          "name": "Neon DB"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const pg       = $('Postgres: Write heir_traces').first().json;\nconst compiled = $('Code: Parse Compiler Output').first().json;\n\nreturn [{\n  json: {\n    success:            !compiled.error,\n    trace_id:           pg.id,\n    status:             compiled.status || 'error',\n    root_decedent:      compiled.root_decedent,\n    total_living_heirs: compiled.total_living_heirs || 0,\n    living_heirs:       compiled.living_heirs       || [],\n    deceased_in_chain:  compiled.deceased_in_chain  || [],\n    gaps:               compiled.gaps               || [],\n    credits_used:       compiled.credits_used       || 0,\n    message:            compiled.error\n      ? `Heir trace failed: ${compiled.parse_error || 'compiler parse error'}`\n      : `Heir trace ${compiled.status}. ${compiled.total_living_heirs || 0} living heir(s) found.`\n  }\n}];",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-000000000029",
+      "name": "Code: Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4200, 420]
+    },
+
+    {
+      "parameters": {
+        "name": "court_search",
+        "description": "Searches NC court records for probate, estate, or civil cases tied to a person. Use to determine if an estate was filed (testate) or if no filing exists (intestate). Input: { name, county }",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/search",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $fromAI('name', 'Full name of the decedent to search') }}"
+            },
+            {
+              "name": "county",
+              "value": "={{ $fromAI('county', 'NC county name where the person lived or died') }}"
+            }
+          ]
+        }
+      },
+      "id": "a1000001-0000-0000-0000-00000000002a",
+      "name": "Court Search: Estate Analyst",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1120, 520]
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $json;\nconst webhookBody = $('Webhook').first().json.body;\nconst currentDepth = webhookBody.cascade_depth || 0;\nconst WEBHOOK_URL = $vars.HEIR_TRACER_URL || 'http://localhost:5678/webhook/heir-trace/start';\nconst DEPTH_LIMIT = 4;\n\nconst deceased_queue = data.deceased_queue || [];\nconst living_heirs = [...(data.living_heirs || [])];\nconst gaps = [...(data.gaps || [])];\nconst deceased_in_chain = [];\n\nfor (const deceased of deceased_queue) {\n  if (currentDepth >= DEPTH_LIMIT) {\n    gaps.push(`${deceased.name} — cascade depth limit (${DEPTH_LIMIT}). Manual review required.`);\n    deceased_in_chain.push({\n      name:              deceased.name,\n      relationship_path: `${deceased.relationship} of ${data.root_decedent}`,\n      share_pct:         deceased.share_pct,\n      share_fraction:    deceased.share_fraction,\n      dod:               deceased.dod || null,\n      estate_type:       null,\n      cascaded_to:       [],\n      evidence:          deceased.verification || {}\n    });\n    continue;\n  }\n\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: WEBHOOK_URL,\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({\n        deceased_owner:    deceased.name,\n        last_known_state:  deceased.state  || webhookBody.last_known_state,\n        last_known_county: deceased.county || webhookBody.last_known_county,\n        approx_death_year: deceased.dod ? String(deceased.dod).substring(0, 4) : null,\n        property_id:       deceased.property_id  || webhookBody.property_id,\n        conclusion_id:     deceased.conclusion_id || webhookBody.conclusion_id,\n        session_id:        webhookBody.session_id || null,\n        cascade_depth:        currentDepth + 1,\n        parent_share_pct:     deceased.share_pct,\n        cascade_parent:       data.root_decedent,\n        estate_path_status:   'unknown_check_court_records'\n      })\n    });\n\n    const sub = typeof resp === 'string' ? JSON.parse(resp) : resp;\n    const subLiving = (sub.living_heirs || []).map(h => ({\n      ...h,\n      share_pct:         parseFloat(((h.share_pct / 100) * deceased.share_pct).toFixed(4)),\n      relationship_path: `${h.relationship_path || h.name} → via ${deceased.name}`,\n      estate_path:       `${h.estate_path || 'intestate'} → cascade from ${deceased.name}`\n    }));\n\n    living_heirs.push(...subLiving);\n\n    if (sub.gaps && sub.gaps.length) {\n      gaps.push(...sub.gaps.map(g => `[${deceased.name} cascade] ${g}`));\n    }\n\n    deceased_in_chain.push({\n      name:              deceased.name,\n      relationship_path: `${deceased.relationship} of ${data.root_decedent}`,\n      share_pct:         deceased.share_pct,\n      share_fraction:    deceased.share_fraction,\n      dod:               deceased.dod || null,\n      estate_type:       sub.status !== 'error' ? 'intestate' : null,\n      cascaded_to:       subLiving.map(h => h.name),\n      evidence:          deceased.verification || {}\n    });\n\n  } catch (err) {\n    gaps.push(`${deceased.name} — cascade error: ${err.message}`);\n    deceased_in_chain.push({\n      name:              deceased.name,\n      relationship_path: `${deceased.relationship} of ${data.root_decedent}`,\n      share_pct:         deceased.share_pct,\n      share_fraction:    deceased.share_fraction,\n      dod:               deceased.dod || null,\n      estate_type:       null,\n      cascaded_to:       [],\n      evidence:          deceased.verification || {}\n    });\n  }\n}\n\nreturn [{\n  json: {\n    living_heirs,\n    deceased_in_chain,\n    gaps,\n    credits_used:  data.credits_used  || 0,\n    root_decedent: data.root_decedent,\n    property_id:   data.property_id,\n    conclusion_id: data.conclusion_id\n  }\n}];",
+        "language": "javaScript"
+      },
+      "id": "a1000001-0000-0000-0000-00000000002b",
+      "name": "Code: Cascade Deceased Heirs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3160, 100]
+    },
+
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "a1000001-0000-0000-0000-00000000002c",
+      "name": "Merge: Pre-Compiler",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3400, 300]
+    }
+
+  ],
+
+  "connections": {
+
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Postgres: Load Context",        "type": "main", "index": 0 },
+          { "node": "Skip Tracer: Root Owner",        "type": "main", "index": 0 },
+          { "node": "Verification Agent: Root Owner", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+
+    "Postgres: Load Context": {
+      "main": [
+        [ { "node": "Merge A: Phase 1", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Skip Tracer: Root Owner": {
+      "main": [
+        [ { "node": "Merge A: Phase 1", "type": "main", "index": 1 } ]
+      ]
+    },
+
+    "Skip Tracer Root: Model": {
+      "ai_languageModel": [
+        [ { "node": "Skip Tracer: Root Owner", "type": "ai_languageModel", "index": 0 } ]
+      ]
+    },
+
+    "SkipGenie Search: Root": {
+      "ai_tool": [
+        [ { "node": "Skip Tracer: Root Owner", "type": "ai_tool", "index": 0 } ]
+      ]
+    },
+
+    "Verification Agent: Root Owner": {
+      "main": [
+        [ { "node": "Merge B: Phase 1", "type": "main", "index": 1 } ]
+      ]
+    },
+
+    "Verification Root: Model": {
+      "ai_languageModel": [
+        [ { "node": "Verification Agent: Root Owner", "type": "ai_languageModel", "index": 0 } ]
+      ]
+    },
+
+    "Web Search: Root": {
+      "ai_tool": [
+        [ { "node": "Verification Agent: Root Owner", "type": "ai_tool", "index": 0 } ]
+      ]
+    },
+
+    "Merge A: Phase 1": {
+      "main": [
+        [ { "node": "Merge B: Phase 1", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Merge B: Phase 1": {
+      "main": [
+        [ { "node": "Estate Analyst: Root Owner", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Estate Analyst Root: Model": {
+      "ai_languageModel": [
+        [ { "node": "Estate Analyst: Root Owner", "type": "ai_languageModel", "index": 0 } ]
+      ]
+    },
+
+    "Estate Analyst: Root Owner": {
+      "main": [
+        [ { "node": "Code: Parse Heir List", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Code: Parse Heir List": {
+      "main": [
+        [ { "node": "Split In Batches: Level-1 Heirs", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Split In Batches: Level-1 Heirs": {
+      "main": [
+        [ { "node": "Skip Tracer: Per Heir",   "type": "main", "index": 0 } ],
+        [ { "node": "Merge: Level-1 Complete", "type": "main", "index": 1 } ]
+      ]
+    },
+
+    "Skip Tracer Per Heir: Model": {
+      "ai_languageModel": [
+        [ { "node": "Skip Tracer: Per Heir", "type": "ai_languageModel", "index": 0 } ]
+      ]
+    },
+
+    "SkipGenie Search: Per Heir": {
+      "ai_tool": [
+        [ { "node": "Skip Tracer: Per Heir", "type": "ai_tool", "index": 0 } ]
+      ]
+    },
+
+    "Skip Tracer: Per Heir": {
+      "main": [
+        [ { "node": "Verification Agent: Per Heir", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Verification Per Heir: Model": {
+      "ai_languageModel": [
+        [ { "node": "Verification Agent: Per Heir", "type": "ai_languageModel", "index": 0 } ]
+      ]
+    },
+
+    "Web Search: Per Heir": {
+      "ai_tool": [
+        [ { "node": "Verification Agent: Per Heir", "type": "ai_tool", "index": 0 } ]
+      ]
+    },
+
+    "Verification Agent: Per Heir": {
+      "main": [
+        [ { "node": "Code: Route + Accumulate", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Code: Route + Accumulate": {
+      "main": [
+        [ { "node": "Merge: Level-1 Complete", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Merge: Level-1 Complete": {
+      "main": [
+        [ { "node": "Code: Separate Results", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Code: Separate Results": {
+      "main": [
+        [ { "node": "IF: Any Deceased Heirs?", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "IF: Any Deceased Heirs?": {
+      "main": [
+        [ { "node": "Code: Cascade Deceased Heirs", "type": "main", "index": 0 } ],
+        [ { "node": "Merge: Pre-Compiler",          "type": "main", "index": 1 } ]
+      ]
+    },
+
+    "Code: Cascade Deceased Heirs": {
+      "main": [
+        [ { "node": "Merge: Pre-Compiler", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Merge: Pre-Compiler": {
+      "main": [
+        [ { "node": "Code: Build Compiler Input", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Code: Build Compiler Input": {
+      "main": [
+        [ { "node": "Heir Tree Compiler", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Court Search: Estate Analyst": {
+      "ai_tool": [
+        [ { "node": "Estate Analyst: Root Owner", "type": "ai_tool", "index": 0 } ]
+      ]
+    },
+
+    "Heir Tree Compiler: Model": {
+      "ai_languageModel": [
+        [ { "node": "Heir Tree Compiler", "type": "ai_languageModel", "index": 0 } ]
+      ]
+    },
+
+    "Heir Tree Compiler": {
+      "main": [
+        [ { "node": "Code: Parse Compiler Output", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Code: Parse Compiler Output": {
+      "main": [
+        [ { "node": "Postgres: Write heir_traces", "type": "main", "index": 0 } ]
+      ]
+    },
+
+    "Postgres: Write heir_traces": {
+      "main": [
+        [ { "node": "Code: Format Response", "type": "main", "index": 0 } ]
+      ]
+    }
+
+  },
+
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": []
+}

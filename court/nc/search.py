@@ -171,6 +171,11 @@ def get_register_of_actions(case_url: str) -> list[dict]:
                 continue
             raise RuntimeError("Register of Actions blocked by WAF after token refresh — run: python -m court.nc.session")
 
+        if resp.status_code == 404:
+            # Portal /app/ routes need a different WAF context than /Portal/ — API is inaccessible.
+            # Return empty events so callers can treat this as "no events found" rather than crashing.
+            return []
+
         if resp.status_code != 200:
             raise RuntimeError(f"Register of Actions API returned {resp.status_code}")
         break

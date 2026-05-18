@@ -77,6 +77,19 @@ from investigate.handlers import (
     court_pull as inv_court_pull,
     pull_deed as inv_pull_deed,
 )
+from heir.handlers import (
+    create_session as heir_create_session,
+    write_person as heir_write_person,
+    load_persons as heir_load_persons,
+    load_obituary_texts as heir_load_obituary_texts,
+    write_heir_tree as heir_write_heir_tree,
+    filter_cascade as heir_filter_cascade,
+    queue_persons as heir_queue_persons,
+    next_person as heir_next_person,
+    complete_person as heir_complete_person,
+    queue_status as heir_queue_status,
+    claim_fa_trigger as heir_claim_fa_trigger,
+)
 
 _lock = threading.Lock()
 PORT = int(os.getenv("PORT", 8000))
@@ -304,7 +317,124 @@ def _nc_court_roa(data: dict) -> tuple[int, dict]:
         return 400, {"error": "case_url is required (from register_of_actions_url in search results)"}
     events = nc_court_roa(case_url)
     stage = classify_foreclosure_stage(events)
-    return 200, {"stage": stage, "event_count": len(events), "events": events}
+    roa_unavailable = len(events) == 0
+    return 200, {
+        "stage": stage,
+        "event_count": len(events),
+        "events": events,
+        "roa_unavailable": roa_unavailable,
+        "note": "Register of Actions API is blocked by WAF for /app/ routes — use Court Search results (case_type, status) to determine estate_filed." if roa_unavailable else None,
+    }
+
+
+_JS_WALL_SIGNALS = [
+    "enable javascript",
+    "please enable javascript",
+    "just a moment",
+    "checking your browser",
+    "enable cookies",
+    "please turn javascript on",
+]
+
+_playwright_lock = threading.Lock()
+
+
+def _html_to_text(raw_html: str) -> str:
+    import html as html_mod
+    import re
+    text = re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", " ", raw_html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html_mod.unescape(text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    return text
+
+
+def _is_js_wall(text: str) -> bool:
+    if len(text) > 800:
+        return False
+    lower = text.lower()
+    return any(signal in lower for signal in _JS_WALL_SIGNALS)
+
+
+def _fetch_with_playwright(url: str, max_chars: int) -> str:
+    try:
+        from playwright.sync_api import sync_playwright
+        with _playwright_lock:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                )
+                context = browser.new_context(
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0.0.0 Safari/537.36"
+                    )
+                )
+                page = context.new_page()
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=12000)
+                except Exception:
+                    pass  # networkidle timeout is ok — grab what we have
+                content = page.content()
+                browser.close()
+        return _html_to_text(content)[:max_chars]
+    except Exception as exc:
+        print(f"[Playwright] {url} -> {exc}")
+        return ""
+
+
+def _fetch_page(data: dict) -> tuple[int, dict]:
+    """
+    Fetch the text content of a URL for obituary extraction.
+    Uses curl_cffi first; falls back to Playwright for JS-rendered pages
+    (legacy.com, tributearchive.com, etc.).
+    Required: url
+    Returns:  { url, text, char_count, truncated, js_rendered }
+    """
+    import re
+    from curl_cffi import requests as cffi_requests
+
+    url = (data.get("url") or "").strip()
+    if not url:
+        return 400, {"error": "url is required"}
+    if not url.startswith(("http://", "https://")):
+        return 400, {"error": "url must start with http:// or https://"}
+
+    max_chars = int(data.get("max_chars") or 8000)
+    js_rendered = False
+
+    try:
+        resp = cffi_requests.get(
+            url,
+            impersonate="chrome120",
+            timeout=20,
+            verify=False,
+            headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+            },
+        )
+        text = _html_to_text(resp.text)
+    except Exception as exc:
+        text = ""
+
+    if _is_js_wall(text) or not text:
+        print(f"[fetch-page] JS wall detected for {url} — falling back to Playwright")
+        text = _fetch_with_playwright(url, max_chars)
+        js_rendered = True
+
+    truncated = len(text) > max_chars
+    return 200, {
+        "url": url,
+        "text": text[:max_chars],
+        "char_count": min(len(text), max_chars),
+        "truncated": truncated,
+        "js_rendered": js_rendered,
+    }
 
 
 def _scout_write(data: dict) -> tuple[int, dict]:
@@ -336,6 +466,7 @@ _ROUTES: dict[str, callable] = {
     "/skipgenie": _skipgenie,
     "/court/nc/search": _nc_court_search,
     "/court/nc/register_of_actions": _nc_court_roa,
+    "/fetch-page":                               _fetch_page,
     "/scout/write": _scout_write,
     # Investigate layer
     "/investigate/property-state":               lambda d: inv_property_state(d),
@@ -356,6 +487,19 @@ _ROUTES: dict[str, callable] = {
     # Verify layer
     "/verify/data":                              lambda d: ver_data(d),
     "/verify/write":                             lambda d: ver_write(d),
+    # Heir tracer layer
+    "/heir/session":                             lambda d: heir_create_session(d),
+    "/heir/write-person":                        lambda d: heir_write_person(d),
+    "/heir/persons":                             lambda d: heir_load_persons(d),
+    "/heir/obituary-text":                       lambda d: heir_load_obituary_texts(d),
+    "/heir/write":                               lambda d: heir_write_heir_tree(d),
+    "/heir/filter-cascade":                      lambda d: heir_filter_cascade(d),
+    # Queue-based worker pattern (v2 architecture)
+    "/heir/queue-persons":                       lambda d: heir_queue_persons(d),
+    "/heir/next-person":                         lambda d: heir_next_person(d),
+    "/heir/complete-person":                     lambda d: heir_complete_person(d),
+    "/heir/queue-status":                        lambda d: heir_queue_status(d),
+    "/heir/claim-fa-trigger":                    lambda d: heir_claim_fa_trigger(d),
 }
 
 

@@ -88,18 +88,26 @@ def search_person(
 
 
 def _parse_result(body: dict) -> dict:
-    record = body["data"][0]
+    records = body["data"]
+    results = []
+    for i, record in enumerate(records):
+        results.append({
+            "result_index": i + 1,
+            "subject_name": record.get("subjectName", ""),
+            "age": record.get("age", ""),
+            "dob": record.get("DOB", ""),
+            "dod": record.get("DOD", ""),
+            "deceased": record.get("deceased", "") == "DECEASED",
+            "addresses": record.get("addressSearch", []),
+            "phones": record.get("phones", []),
+            "emails": record.get("emails", []),
+            "possible_relatives": record.get("possibleRelatives", []),
+            "possible_associates": record.get("possibleAssociates", []),
+            "pid": record.get("pid", ""),
+        })
     return {
-        "subject_name": record.get("subjectName", ""),
-        "age": record.get("age", ""),
-        "dob": record.get("DOB", ""),
-        "dod": record.get("DOD", ""),
-        "deceased": record.get("deceased", "") == "DECEASED",
-        "addresses": record.get("addressSearch", []),
-        "phones": record.get("phones", []),
-        "emails": record.get("emails", []),
-        "possible_relatives": record.get("possibleRelatives", []),
-        "possible_associates": record.get("possibleAssociates", []),
+        "result_count": len(results),
+        "results": results,
         "search_id": body.get("search_id", ""),
         "credits_remaining": body.get("last_credit"),
     }
