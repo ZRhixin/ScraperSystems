@@ -1097,8 +1097,23 @@
         "method": "POST",
         "url": "http://scraper-staging:8000/property/full-research",
         "sendBody": true,
-        "contentType": "json",
-        "jsonBody": "={{ JSON.stringify({\n  parcel_id: $fromAI('parcel_id', 'The property parcel ID'),\n  county: $fromAI('county', 'The county name'),\n  state_code: 'NC'\n}) }}",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "parcel_id",
+              "value": "={{ $fromAI('parcel_id', 'The property parcel ID e.g. 0181466') }}"
+            },
+            {
+              "name": "county",
+              "value": "={{ $fromAI('county', 'The county name e.g. Wake') }}"
+            },
+            {
+              "name": "state_code",
+              "value": "NC"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequestTool",
