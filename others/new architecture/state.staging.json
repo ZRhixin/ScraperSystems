@@ -239,7 +239,7 @@
         "url": "http://scraper-staging:8000/verify/write",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"conclusion_id\": \"{{ $fromAI('conclusion_id', 'The conclusion ID being reviewed') }}\",\n  \"verdict\": \"{{ $fromAI('verdict', 'approved | objection_raised | flagged_for_human') }}\",\n  \"objections\": {{ $fromAI('objections', 'Array of objection objects if verdict is objection_raised, otherwise null', 'json') ?? null }}\n}",
+        "jsonBody": "={{ JSON.stringify({ conclusion_id: $fromAI('conclusion_id', 'The conclusion ID being reviewed'), verdict: $fromAI('verdict', 'approved | objection_raised | flagged_for_human'), objections: $fromAI('objections', 'Array of objection objects, or null', 'json') ?? null }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequestTool",

@@ -54,6 +54,7 @@ from court.nc.search import (
     classify_foreclosure_stage,
     is_tax_foreclosure,
 )
+from court.nc.session import load_waf_token, refresh_waf_token, _TOKEN_FILE
 from scout.writer import write as scout_write
 from conclude.handlers import (
     conclude_data as conc_data,
@@ -302,6 +303,73 @@ def _skipgenie(data: dict) -> tuple[int, dict]:
     return 200, result
 
 
+def _nc_court_session_status(_data: dict) -> tuple[int, dict]:
+    """Returns whether the AWS WAF token is valid and when it was saved."""
+    import time
+    token = load_waf_token()
+    if not token:
+        return 200, {
+            "valid": False,
+            "message": "No valid session. Open the noVNC browser and solve the captcha.",
+            "vnc_url": "http://170.187.145.60:6080/vnc.html",
+        }
+    data = {}
+    try:
+        data = json.loads(_TOKEN_FILE.read_text())
+    except Exception:
+        pass
+    saved_at = data.get("saved_at", 0)
+    age_hours = (time.time() - saved_at) / 3600
+    return 200, {
+        "valid": True,
+        "saved_at": saved_at,
+        "age_hours": round(age_hours, 1),
+        "message": f"Session valid. Saved {age_hours:.1f}h ago.",
+    }
+
+
+_captcha_thread: threading.Thread | None = None
+_captcha_status = {"running": False, "result": None}
+
+
+def _nc_court_refresh_session(_data: dict) -> tuple[int, dict]:
+    """
+    Launches Chromium on the virtual display (:99).
+    User opens noVNC at port 6080 and solves the captcha.
+    The browser closes automatically once the portal loads.
+    """
+    global _captcha_thread, _captcha_status
+
+    if _captcha_status["running"]:
+        return 200, {
+            "status": "already_running",
+            "message": "Browser already open. Connect to noVNC and solve the captcha.",
+            "vnc_url": "http://170.187.145.60:6080/vnc.html",
+        }
+
+    def _run():
+        global _captcha_status
+        _captcha_status = {"running": True, "result": None}
+        try:
+            token = refresh_waf_token(headless=False)
+            _captcha_status = {"running": False, "result": "success", "token_prefix": token[:12] + "..."}
+        except Exception as exc:
+            _captcha_status = {"running": False, "result": "error", "error": str(exc)}
+
+    _captcha_thread = threading.Thread(target=_run, daemon=True)
+    _captcha_thread.start()
+
+    return 200, {
+        "status": "browser_launched",
+        "message": "Chromium is open on the virtual display. Connect to noVNC and solve the captcha.",
+        "vnc_url": "http://170.187.145.60:6080/vnc.html",
+    }
+
+
+def _nc_captcha_status(_data: dict) -> tuple[int, dict]:
+    return 200, _captcha_status
+
+
 def _nc_court_search(data: dict) -> tuple[int, dict]:
     name = (data.get("name") or "").strip()
     if not name:
@@ -464,6 +532,9 @@ _ROUTES: dict[str, callable] = {
     "/county/newhanover/assessor": _newhanover_assessor,
     "/county/buncombe/assessor": _buncombe_assessor,
     "/skipgenie": _skipgenie,
+    "/court/nc/session-status":       _nc_court_session_status,
+    "/court/nc/refresh-session":      _nc_court_refresh_session,
+    "/court/nc/captcha-status":       _nc_captcha_status,
     "/court/nc/search": _nc_court_search,
     "/court/nc/register_of_actions": _nc_court_roa,
     "/fetch-page":                               _fetch_page,

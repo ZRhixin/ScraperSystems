@@ -80,7 +80,10 @@ def refresh_waf_token(headless: bool = False) -> str:
         print("  It will close automatically once the portal loads.")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(channel="chrome", headless=headless)
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
+        )
         ctx = browser.new_context(viewport={"width": 1280, "height": 800})
         page = ctx.new_page()
         page.goto(_PORTAL_URL, timeout=60000)
