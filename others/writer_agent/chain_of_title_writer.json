@@ -1,0 +1,227 @@
+{
+  "name": "Chain of Title → HeirMatrix Writer Agent",
+  "nodes": [
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chain-title-writer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-3200, 500],
+      "id": "cw-0001",
+      "name": "Webhook",
+      "webhookId": "chain-title-writer-v1"
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.id                       AS scraper_property_id,\n  p.parcel_id,\n  p.county,\n  p.state_code,\n  p.address,\n  p.current_owners           AS scout_current_owners,\n  p.short_legal_raw,\n  p.short_legal_parsed,\n  p.last_sale_date,\n  cc.id                      AS conclusion_id,\n  cc.acquisition_type,\n  cc.vesting,\n  cc.current_owners          AS chain_current_owners,\n  cc.vesting_evidence,\n  cc.flags                   AS chain_flags,\n  cc.verify_status,\n  cc.supporting_document_refs,\n  s.status                   AS session_status,\n  s.stop_reason,\n  s.current_phase\nFROM properties p\nLEFT JOIN chain_conclusions cc\n  ON cc.property_id = p.id AND cc.status = 'active'\nLEFT JOIN LATERAL (\n  SELECT status, stop_reason, current_phase\n  FROM investigation_sessions\n  WHERE property_id = p.id\n  ORDER BY id DESC LIMIT 1\n) s ON true\nWHERE p.id = {{ $('Webhook').first().json.body.scraper_property_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [-2960, 500],
+      "id": "cw-0002",
+      "name": "Load Property & Chain",
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_SCRAPER_NEON_CREDENTIAL_ID",
+          "name": "ScraperSystems Neon DB"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  de.id,\n  de.document_type,\n  de.grantor_names,\n  de.grantee_names,\n  de.recorded_date,\n  de.instrument_date,\n  de.book,\n  de.page,\n  de.instrument_number,\n  de.vesting_language,\n  de.legal_description_short,\n  de.legal_match_to_parcel,\n  de.legal_match_method,\n  de.legal_match_notes,\n  de.extraction_confidence,\n  de.conveys_multiple_parcels,\n  de.parcels_conveyed_count,\n  de.references_prior_deed_book,\n  de.references_prior_deed_page,\n  de.summary,\n  de.flags,\n  rc.source_url              AS rod_source_url,\n  rc.capture_type\nFROM document_extractions de\nLEFT JOIN rod_captures rc ON rc.id = de.rod_capture_id\nWHERE de.property_id = {{ $('Webhook').first().json.body.scraper_property_id }}\nORDER BY de.recorded_date ASC NULLS LAST, de.id ASC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [-2720, 500],
+      "id": "cw-0003",
+      "name": "Load Extractions",
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_SCRAPER_NEON_CREDENTIAL_ID",
+          "name": "ScraperSystems Neon DB"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  id,\n  book,\n  page,\n  instrument_number,\n  recorded_date,\n  grantor_raw,\n  grantee_raw,\n  short_legal_raw,\n  verification_status,\n  verification_notes\nFROM appraiser_transfer_history\nWHERE property_id = {{ $('Webhook').first().json.body.scraper_property_id }}\nORDER BY recorded_date ASC NULLS LAST, id ASC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [-2480, 500],
+      "id": "cw-0004",
+      "name": "Load Transfer History",
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_SCRAPER_NEON_CREDENTIAL_ID",
+          "name": "ScraperSystems Neon DB"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const wb = $('Webhook').first().json.body;\nconst propRows = $('Load Property & Chain').all();\nconst extraRows = $('Load Extractions').all();\nconst xferRows  = $('Load Transfer History').all();\n\nconst p  = propRows[0]?.json  || {};\nconst ex = extraRows.map(r => r.json);\nconst tx = xferRows.map(r => r.json);\n\nconst fmt = v => (v === null || v === undefined ? 'null' : JSON.stringify(v));\n\nconst extractionBlock = ex.length === 0\n  ? '  (none)'\n  : ex.map((e, i) => [\n      `  [${i + 1}] id=${e.id}  type=${e.document_type}  confidence=${e.extraction_confidence}`,\n      `       date=${e.recorded_date || e.instrument_date || '?'}  book=${e.book || '?'}/page=${e.page || '?'}  instrument=${e.instrument_number || 'N/A'}`,\n      `       grantors=${fmt(e.grantor_names)}`,\n      `       grantees=${fmt(e.grantee_names)}`,\n      `       legal_match=${e.legal_match_to_parcel}  method=${e.legal_match_method}`,\n      `       vesting_language=${e.vesting_language || 'N/A'}`,\n      `       conveys_multiple=${e.conveys_multiple_parcels}  parcels_count=${e.parcels_conveyed_count}`,\n      `       prior_deed=${e.references_prior_deed_book || '?'}/${e.references_prior_deed_page || '?'}`,\n      `       summary=${e.summary || 'N/A'}`,\n      `       flags=${fmt(e.flags)}`,\n    ].join('\\n')).join('\\n\\n');\n\nconst transferBlock = tx.length === 0\n  ? '  (none)'\n  : tx.map((t, i) => [\n      `  [${i + 1}] book=${t.book}/${t.page}  date=${t.recorded_date}  instrument=${t.instrument_number || 'N/A'}`,\n      `       grantor=${t.grantor_raw}`,\n      `       grantee=${t.grantee_raw}`,\n      `       verification=${t.verification_status}  notes=${t.verification_notes || 'N/A'}`,\n    ].join('\\n')).join('\\n\\n');\n\nconst context = [\n  '=== PROPERTY ===',\n  `  Scraper Property ID : ${p.scraper_property_id}`,\n  `  HeirMatrix Prop ID  : ${wb.heirmatrix_property_id}`,\n  `  Parcel ID           : ${p.parcel_id}`,\n  `  County              : ${p.county}  |  State: ${p.state_code}`,\n  `  Address             : ${p.address || 'N/A'}`,\n  `  Last Sale Date      : ${p.last_sale_date || 'Unknown'}`,\n  `  Scout Owners        : ${fmt(p.scout_current_owners)}`,\n  `  Short Legal (parsed): ${p.short_legal_parsed || p.short_legal_raw || 'N/A'}`,\n  '',\n  '=== CHAIN CONCLUSION ===',\n  `  Conclusion ID       : ${p.conclusion_id || 'NONE — no active conclusion'}`,\n  `  Acquisition Type    : ${p.acquisition_type || 'unresolved'}`,\n  `  Vesting             : ${p.vesting || 'unknown'}`,\n  `  Vesting Evidence    : ${fmt(p.vesting_evidence)}`,\n  `  Chain Current Owners: ${fmt(p.chain_current_owners)}`,\n  `  Chain Flags         : ${fmt(p.chain_flags)}`,\n  `  Verify Status       : ${p.verify_status || 'N/A'}`,\n  `  Supporting Docs     : ${fmt(p.supporting_document_refs)}`,\n  `  Session Status      : ${p.session_status || 'N/A'}  |  Phase: ${p.current_phase || 'N/A'}`,\n  `  Stop Reason         : ${p.stop_reason || 'None'}`,\n  '',\n  `=== DOCUMENT EXTRACTIONS (${ex.length} records) ===`,\n  extractionBlock,\n  '',\n  `=== APPRAISER TRANSFER HISTORY (${tx.length} records) ===`,\n  transferBlock,\n].join('\\n');\n\nreturn [{\n  json: {\n    context,\n    heirmatrix_property_id: wb.heirmatrix_property_id,\n    scraper_property_id:    wb.scraper_property_id,\n    county:                 p.county,\n    state_code:             p.state_code,\n    extraction_count:       ex.length,\n    transfer_count:         tx.length,\n    has_conclusion:         !!p.conclusion_id,\n  }\n}];",
+        "language": "javaScript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2240, 500],
+      "id": "cw-0005",
+      "name": "Merge Context"
+    },
+
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write chain of title events to HeirMatrix.\n\nHeirMatrix Property ID: {{ $json.heirmatrix_property_id }}\nScraperSystems Property ID: {{ $json.scraper_property_id }}\nCounty: {{ $json.county }}, {{ $json.state_code }}\nExtractions available: {{ $json.extraction_count }}\nTransfer history rows: {{ $json.transfer_count }}\nHas chain conclusion: {{ $json.has_conclusion }}\n\n{{ $json.context }}\n\nNow execute:\n1. Call Get Existing Events to see what is already written (avoid duplicates).\n2. Working oldest → newest, call Create Title Event for each document extraction that belongs in the chain.\n3. Report what you created, skipped, and any gaps or concerns.",
+        "options": {
+          "systemMessage": "You are the Chain of Title Writer Agent for HeirMatrix/TitleMatrix. You translate completed chain-of-ownership research from the ScraperSystems Neon database into HeirMatrix title events via the API.\n\n---\n\n## STEP 1 — Check existing events\n\nCall Get Existing Events with the HeirMatrix property ID.\nNote which book/page combinations are already written (proof_reference field).\nDo NOT create a duplicate — if a matching book/page event already exists, skip it.\n\n---\n\n## STEP 2 — Map each document extraction to an event_type\n\n| ScraperSystems document_type   | HeirMatrix event_type         | Notes                                      |\n|-------------------------------|-------------------------------|--------------------------------------------|\n| warranty_deed                  | warranty_deed                 |                                            |\n| quitclaim                      | quitclaim_deed                |                                            |\n| corrective_deed                | deed_transfer                 | Note in description it is corrective       |\n| deed_of_distribution           | deed_transfer                 | Note in description it is a dist. deed     |\n| deed_of_trust / mortgage       | SKIP                          | Incidental — not in ownership chain        |\n| release                        | SKIP                          | Incidental                                 |\n| lis_pendens / judgment_lien    | SKIP                          | Incidental                                 |\n| affidavit_of_death             | death_intestate               | Or death_testate if will evidence present  |\n| estate_order                   | court_order                   |                                            |\n| other                          | other                         |                                            |\n\nIf acquisition_type = \"inheritance_court_only\" and there is no deed of distribution extraction, add a death_intestate event inferred from context (status: \"pending\").\n\n---\n\n## STEP 3 — Set parties\n\nFor every event:\n- grantor_names array → one party each, direction = \"from\"\n- grantee_names array → one party each, direction = \"to\"\n- Always use person_name_override (not person_id) — use the exact name from the extraction\n- Names in grantor_names / grantee_names are JSONB arrays of strings; iterate them\n\nFractional interests:\n- vesting = \"sole\" → grantee gets interest_numerator=1, interest_denominator=1\n- vesting = \"tenants_in_common\" or \"jtwros\" → divide equally among grantees (e.g., 2 grantees → each 1/2)\n- If vesting_language states a specific fraction (e.g., \"an undivided 1/3 interest\"), use that exactly\n- If unknown → omit numerator/denominator, set interest_description to \"unknown — manual review needed\"\n\n---\n\n## STEP 4 — Set proof fields and status\n\nproof_reference: \"Book {book} / Page {page}\"\nproof_location: \"{County} County Register of Deeds, {State}\"\n\nstatus:\n- \"confirmed\" → extraction_confidence = high or medium AND legal_match_to_parcel = high or medium\n- \"needs_review\" → extraction_confidence = low OR legal_match_to_parcel = low or none\n- \"pending\" → inferred event (no source document in extractions)\n\n---\n\n## STEP 5 — Write description\n\nWrite a clear one-sentence description:\nExamples:\n- \"Warranty deed from John A Smith to Mary B Smith, conveying sole ownership.\"\n- \"Quitclaim deed from Robert Lee to Robert Lee and Patricia Lee as joint tenants with right of survivorship.\"\n- \"Death of Patricia Lee (intestate) — ownership passes under NC Chapter 29.\"\n- \"Deed of distribution from Estate of John A Smith to Robert Smith (1/2) and Susan Jones (1/2).\"\n\n---\n\n## FINAL REPORT\n\nAfter all writes, summarize:\n- Events created (list each: type, date, book/page)\n- Events skipped (reason: duplicate or incidental)\n- Gaps or flags (any unresolved ownership, low-confidence extractions, missing deeds)",
+          "maxIterations": 25
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [-2000, 500],
+      "id": "cw-0006",
+      "name": "Chain of Title Writer"
+    },
+
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.4,
+      "position": [-2240, 720],
+      "id": "cw-0007",
+      "name": "Claude Sonnet 4.6",
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_WITH_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic account"
+        }
+      }
+    },
+
+    {
+      "parameters": {
+        "toolDescription": "Get all existing title events for a HeirMatrix property. Returns an array of events — check their proof_reference field (format: 'Book X / Page Y') to identify which deeds are already written. Call this FIRST before creating anything.",
+        "method": "GET",
+        "url": "={{ $env.HEIRMATRIX_BASE_URL }}/api/v1/title-events/property/{{ $fromAI('property_id', 'HeirMatrix property ID as an integer') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.HEIRMATRIX_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [-1760, 720],
+      "id": "cw-0008",
+      "name": "Get Existing Events"
+    },
+
+    {
+      "parameters": {
+        "toolDescription": "Create one title event in HeirMatrix. Provide the full request body as a JSON string. The body schema: { property_id (int, required), event_type (string, required — one of: deed_transfer, quitclaim_deed, warranty_deed, special_warranty_deed, death_intestate, death_testate, death_survivorship, probate_filing, trust_dissolution, court_order, affidavit_heirship, other), event_date (string YYYY-MM-DD or null), event_date_approximate (bool), description (string, required, max 1000 chars), proof_reference (string or null, format 'Book X / Page Y'), proof_location (string or null, e.g. 'Wake County Register of Deeds, NC'), notes (string or null), status (string: confirmed | pending | needs_review), parties (array of { person_name_override: string, direction: 'from' | 'to', interest_numerator: int or null, interest_denominator: int or null, interest_description: string or null }) }. Call once per deed — do not batch.",
+        "method": "POST",
+        "url": "={{ $env.HEIRMATRIX_BASE_URL }}/api/v1/title-events/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.HEIRMATRIX_API_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.parse($fromAI('request_body', 'Complete request body as a JSON string matching the schema in the tool description.')) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [-1520, 720],
+      "id": "cw-0009",
+      "name": "Create Title Event"
+    },
+
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [-1760, 500],
+      "id": "cw-0010",
+      "name": "Respond to Webhook"
+    }
+
+  ],
+
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Load Property & Chain", "type": "main", "index": 0 }]]
+    },
+    "Load Property & Chain": {
+      "main": [[{ "node": "Load Extractions", "type": "main", "index": 0 }]]
+    },
+    "Load Extractions": {
+      "main": [[{ "node": "Load Transfer History", "type": "main", "index": 0 }]]
+    },
+    "Load Transfer History": {
+      "main": [[{ "node": "Merge Context", "type": "main", "index": 0 }]]
+    },
+    "Merge Context": {
+      "main": [[{ "node": "Chain of Title Writer", "type": "main", "index": 0 }]]
+    },
+    "Chain of Title Writer": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Claude Sonnet 4.6": {
+      "ai_languageModel": [[{ "node": "Chain of Title Writer", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Get Existing Events": {
+      "ai_tool": [[{ "node": "Chain of Title Writer", "type": "ai_tool", "index": 0 }]]
+    },
+    "Create Title Event": {
+      "ai_tool": [[{ "node": "Chain of Title Writer", "type": "ai_tool", "index": 0 }]]
+    }
+  },
+
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

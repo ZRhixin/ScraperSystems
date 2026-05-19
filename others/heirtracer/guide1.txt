@@ -1,0 +1,1223 @@
+Family Assembler Agent — Implementation Specification
+System: TitleMatrix / FPILS Heir Tracing Component: Family Assembler Agent Version: 1.0 (Initial implementation) Audience: Backend developer + n8n workflow developer State Coverage: North Carolina (state-agnostic architecture; only inference scenarios are NC-tuned) Companion Document: Estate Analyst Agent Implementation Specification v1.0
+
+
+Table of Contents
+Purpose & Scope
+Where the Assembler Fits
+Design Principles
+Inputs
+Output Schema
+The Three-Tier Evidence Model
+Identity Confirmation Protocol
+Connectivity Rule
+Named Scenarios & Edge Cases
+The System Prompt
+Developer Action Items (Flags)
+Testing & Validation
+
+
+1. Purpose & Scope
+What the Family Assembler does
+The Family Assembler is a legal-grade relationship-inference agent. It reads all the research records the upstream sub-agents (SkipGenie, Obituary Researcher, Title Attorney) have written to the database for a given heir-tracing session, and produces a structured family tree (as a graph of persons + relationship edges) that the Estate Analyst downstream uses to apply NC Chapter 29.
+
+The Assembler is the only agent in the pipeline that sees all the research data at once. This gives it a unique capability the per-person sub-agents lack: it can cross-reference one person's records against another's to corroborate or contradict relationship claims, confirm identities, and build out the full family graph beyond what any single source reveals.
+What the Assembler does NOT do
+Does not browse the web, call SkipGenie, or search obituary sites — that's the Orchestrator's job
+Does not apply NC Chapter 29 share calculations — that's the Estate Analyst's job
+Does not write to the database — read-and-reason only
+Does not query across multiple sessions — strictly scoped to the injected session_id
+Does not invent facts — if evidence is missing, records null and flags a data_gap
+Does not silently resolve ambiguity — flags it for human review
+The core challenge
+When sub-agents write their records, relationship information is uneven:
+
+Obituary Researcher captures relationships when the obituary explicitly states them (e.g., "survived by son Dennis Hayes" → relationship_hint: son). It does NOT capture relationships for people the obituary doesn't mention.
+SkipGenie does NOT label relationships. It returns a flat list of "possible relatives" with no relationship type.
+Title Attorney captures legal facts (estate filings, deed transfers) but typically not relationship types beyond what the filings declare.
+
+The Assembler's hardest job is inferring relationships when no single source labels them explicitly, by cross-referencing surname patterns, age math, address co-occurrence, and most importantly, mentions of the same person across multiple researched relatives' records.
+
+
+2. Where the Assembler Fits
+Webhook (property_id)
+
+   │
+
+   ▼
+
+Root Owner Research      ◄── identifies root decedent + relative list
+
+   │
+
+   ▼
+
+Create Heir Session      ◄── session_id created
+
+   │
+
+   ▼
+
+Loop Over Relatives  ──► Orchestrator (SkipGenie, Obituary, Title Attorney)
+
+   │                        │
+
+   │                        ▼
+
+   │                     Writes to heir_research_persons
+
+   │◄───────────────────────┘
+
+   ▼
+
+★ FAMILY ASSEMBLER ★    ◄── reads all records, builds family graph
+
+   │
+
+   ▼
+
+Parse Family Tree       ◄── extracts JSON
+
+   │
+
+   ▼
+
+Intestate Expert        ◄── applies NC Ch. 29, computes shares
+
+   │
+
+   ▼
+
+More Cascade?           ◄── if deceased heirs need deeper research → loop back
+
+   │
+
+   ▼
+
+Genealogist             ◄── writes final tree to DB
+
+On cascade re-runs, the Assembler re-reads all data from the DB fresh — it does NOT receive its prior output as input. This makes every Assembler run stateless and recoverable.
+
+
+3. Design Principles
+These principles override any specific rule below if there's a conflict.
+3.1 Fact-first, never invent
+Every relationship and every person in the output must be traceable to a specific source field in the input data. The Assembler cannot create a person who doesn't appear in the research records, and it cannot assert a relationship without citing the source.
+3.2 Flag, don't resolve
+When in doubt, flag it. Never silently resolve ambiguity, conflicts, or weak signals. The cost of flagging too much is one extra human review per file. The cost of silently picking wrong is a defective title.
+3.3 Confidence reflects the weakest link
+If a conclusion rests on three pieces of evidence and one of them is weak, the confidence is low — not the average. This prevents confidence inflation across compound inferences.
+3.4 Connectivity discipline
+Every person in the output must trace back through relationship edges to at least one deceased person in the trace. Random unconnected people pollute the tree and cause downstream errors. If a person can't be connected, they're either excluded with a note in data_gaps, or included with explicit connection_unverified status.
+3.5 Cross-referencing is a superpower
+The Assembler is the only agent that sees all research records at once. Use this. A person mentioned in two researched relatives' obituaries is far more reliably identified than a person in only one. Build connections opportunistically wherever the data supports them.
+3.6 SkipGenie is for identity confirmation, not for adding tree members
+A name appearing in SkipGenie's possible-relatives list is NOT sufficient to add that person to the family tree. SkipGenie data (birth year, addresses, possible relatives) is used to confirm the identity of people mentioned in obituaries or court records — making sure we're looking at the right Dan Mims, not a different one.
+
+
+4. Inputs
+4.1 Prompt identifiers (injected per run)
+Variable
+Example
+Source
+session_id
+10
+Create Heir Session node
+property_id
+3
+Webhook body
+root_decedent_name
+"LYDIA HAYES"
+Parsed from Root Owner Research output
+
+4.2 Research dataset (loaded via DB tool)
+The Assembler's only tool is Load Family Dataset, which returns all per-person research records for the session. Each record has the following fields. See §11 Developer Action Items for fields that need to be added or restructured.
+
+Field
+Type
+Source Agent
+Notes
+input_name
+text
+Root Owner Research
+Name as appeared in relative list
+matched_full_name
+text
+SkipGenie
+Best-matched identity
+relationship_hint
+text
+Root Owner Research / Obituary
+"child", "sibling", etc. (when explicitly stated)
+vital_status
+text
+SkipGenie + Obituary
+living / deceased / unknown
+date_of_death
+text
+Obituary / Court
+Empty if not confirmed
+marital_status_at_death
+text
+Obituary
+married/widowed/divorced/single
+surviving_spouse_name
+text
+Obituary
+Name if found
+estate_filed
+boolean
+Title Attorney
+true/false/null
+had_will
+boolean
+Title Attorney
+true/false/null
+family_alive_at_death
+json[]
+Obituary
+Survivors named in obituary
+deed_transfers
+json[]
+Title Attorney
+Any deeds filed as grantor
+obituary_url
+text
+Obituary Researcher
+Full URL
+obituary_text
+text
+Obituary Researcher
+2-5 sentence excerpt naming survivors
+claim_sources
+jsonb
+Orchestrator
+Evidence + confidence per fact
+notes
+text
+Orchestrator
+Full narrative
+skip_genie_birth_year
+int
+SkipGenie
+NEW — see §11
+skip_genie_known_addresses
+json[]
+SkipGenie
+NEW — last 1-3 addresses, city/county/state
+skip_genie_possible_relatives
+json[]
+SkipGenie
+NEW — structured list, names only (no relationships)
+
+
+
+5. Output Schema
+The Assembler outputs a single JSON object. This is a graph structure, not the flat family_members array shown in earlier drafts. See §11 for developer note on consumer changes.
+
+{
+
+  "session_id": 10,
+
+  "property_id": 3,
+
+  "root_decedent": {
+
+    "name": "LYDIA HAYES",
+
+    "person_ref": "person_001",
+
+    "identification_basis": "session_field"
+
+  },
+
+  "persons": [
+
+    {
+
+      "person_ref": "person_001",
+
+      "input_name": "LYDIA HAYES",
+
+      "matched_full_name": "Lydia Mae Hayes",
+
+      "is_root": true,
+
+      "vital_status": "deceased",
+
+      "date_of_birth": "1908-04-12",
+
+      "date_of_death": "1985-06-04",
+
+      "date_of_death_confidence": "high",
+
+      "date_of_death_source": "obituary",
+
+      "marital_status_at_death": "widowed",
+
+      "marital_status_confidence": "high",
+
+      "estate_filed": false,
+
+      "had_will": null,
+
+      "identity_confidence": "high",
+
+      "identity_confirmation_basis": [
+
+        "obituary location matches SkipGenie last address",
+
+        "birth year matches obituary age at death",
+
+        "2 of 4 SkipGenie possible-relatives appear in obituary survivors list"
+
+      ],
+
+      "source_record_id": "heir_research_persons.id=42"
+
+    },
+
+    {
+
+      "person_ref": "person_002",
+
+      "input_name": "Dennis Hayes",
+
+      "matched_full_name": "Dennis R Hayes",
+
+      "is_root": false,
+
+      "vital_status": "living",
+
+      "identity_confidence": "high",
+
+      "identity_confirmation_basis": [
+
+        "appears in Lydia's obituary as 'son Dennis Hayes'",
+
+        "SkipGenie birth year (1942) consistent with Lydia's age (b. 1908)"
+
+      ],
+
+      "source_record_id": "heir_research_persons.id=43"
+
+    }
+
+  ],
+
+  "relationships": [
+
+    {
+
+      "edge_id": "edge_001",
+
+      "person_a_ref": "person_002",
+
+      "person_b_ref": "person_001",
+
+      "relationship_type": "child_of",
+
+      "family_relationship": "biological",
+
+      "tier": "stated",
+
+      "confidence": "high",
+
+      "evidence": [
+
+        {
+
+          "source_type": "obituary",
+
+          "source_record_id": "heir_research_persons.id=42",
+
+          "source_url": "https://legacy.com/obituaries/lydia-hayes",
+
+          "excerpt": "Survived by son Dennis Hayes of Raleigh"
+
+        }
+
+      ],
+
+      "evidence_summary": "Lydia's obituary explicitly names Dennis as her son"
+
+    },
+
+    {
+
+      "edge_id": "edge_002",
+
+      "person_a_ref": "person_003",
+
+      "person_b_ref": "person_002",
+
+      "relationship_type": "spouse_of",
+
+      "family_relationship": "ceremonial_marriage",
+
+      "tier": "corroborated",
+
+      "confidence": "medium",
+
+      "evidence": [
+
+        {
+
+          "source_type": "obituary",
+
+          "source_record_id": "heir_research_persons.id=42",
+
+          "excerpt": "Survived by daughter-in-law Patricia Hayes"
+
+        },
+
+        {
+
+          "source_type": "skip_genie",
+
+          "source_record_id": "heir_research_persons.id=43",
+
+          "excerpt": "Patricia Hayes listed as possible relative of Dennis Hayes; shared address history"
+
+        }
+
+      ],
+
+      "evidence_summary": "Lydia's obituary identifies Patricia as daughter-in-law; SkipGenie confirms Patricia as Dennis's relative with shared address. Marriage type (ceremonial vs common-law) not explicitly confirmed."
+
+    }
+
+  ],
+
+  "data_gaps": [
+
+    {
+
+      "gap_id": "gap_001",
+
+      "type": "missing_fact",
+
+      "subject_person_ref": "person_002",
+
+      "missing": "date_of_birth",
+
+      "why_relevant": "Needed to confirm 120-hour survival rule analysis if Dennis predeceased Lydia (not currently the case but flagged for completeness)"
+
+    },
+
+    {
+
+      "gap_id": "gap_002",
+
+      "type": "unconnected_person",
+
+      "subject_name": "James Hayes",
+
+      "appeared_in": ["SkipGenie possible-relatives for Lydia Hayes"],
+
+      "why_unconnected": "Name appeared once in SkipGenie list, no obituary, court, or cross-reference found. Same surname insufficient alone to assert relationship.",
+
+      "recommended_research": "Search obituaries for James Hayes in Wake County, NC, 1990-2025"
+
+    }
+
+  ],
+
+  "disputed_items": [
+
+    {
+
+      "dispute_id": "dispute_001",
+
+      "type": "relationship_conflict",
+
+      "persons_involved": ["person_002", "person_001"],
+
+      "claims": [
+
+        {
+
+          "source": "Lydia's obituary",
+
+          "asserts": "Dennis is Lydia's son (biological/legal child)"
+
+        },
+
+        {
+
+          "source": "Wake County probate filing 85SP0421",
+
+          "asserts": "Dennis listed as nephew of decedent"
+
+        }
+
+      ],
+
+      "assembler_assessment": "Cannot resolve. Obituary may use 'son' informally; court filing may have clerical error. Requires human review.",
+
+      "downstream_impact": "Estate Analyst cannot apply §29-15(2) until Dennis's relationship to Lydia is confirmed."
+
+    }
+
+  ],
+
+  "assembler_metadata": {
+
+    "model_version": "claude-opus-4-7",
+
+    "prompt_version": "v1.0",
+
+    "run_timestamp": "2026-05-13T14:32:00Z",
+
+    "persons_processed": 8,
+
+    "edges_created": 7,
+
+    "high_confidence_edges": 4,
+
+    "medium_confidence_edges": 2,
+
+    "low_confidence_edges": 1,
+
+    "connectivity_check_passed": true
+
+  }
+
+}
+5.1 Schema field references
+person_ref is an internal ID the Assembler assigns (person_001, person_002, etc.) so edges can reference persons cleanly even when persons don't yet have DB IDs. Downstream processing resolves these to real IDs.
+
+relationship_type allowed values: child_of, parent_of, spouse_of, sibling_of, grandchild_of, grandparent_of, aunt_uncle_of, niece_nephew_of, cousin_of, in_law_of, step_relation_of, unknown_kin
+
+family_relationship allowed values: biological, adopted, step, half_blood_paternal, half_blood_maternal, ceremonial_marriage, common_law_marriage, in_law_via_marriage, informal_no_legal_relation (for the "loved like a son" case), unknown
+
+tier allowed values: stated, corroborated, weak
+
+confidence allowed values: high, medium, low, unknown
+
+
+6. The Three-Tier Evidence Model
+Every relationship edge MUST be tagged with one of three tiers. The tier determines confidence ceiling.
+Tier 1 — STATED
+A source explicitly states the relationship.
+
+Obituary: "survived by son Dennis Hayes" → Lydia—Dennis is child_of, tier stated
+Probate filing: "John Smith, surviving spouse of decedent" → tier stated
+Death certificate listing parents → tier stated
+
+Confidence ceiling: high (assuming identity confirmed — see §7)
+
+Stated does not automatically mean high confidence. The source must also pass identity confirmation, and the relationship type must not contradict other stated sources. If those conditions aren't met, the edge stays stated tier but confidence drops.
+Tier 2 — CORROBORATED
+Multiple sources together imply a relationship even though no single source states it explicitly.
+
+Example: Patricia appears in Lydia's obituary as "daughter-in-law" (no spouse named). Separately, Dennis (Lydia's confirmed son) has Patricia as a SkipGenie possible-relative with shared address history. Cross-referenced: Patricia is Dennis's spouse. The Lydia obituary alone doesn't say so; Dennis's SkipGenie record doesn't label it. Together they corroborate it.
+
+Confidence ceiling: medium
+
+A corroborated edge requires at least two independent signals pointing to the same conclusion. A single signal, no matter how strong, is not corroborated — it's either stated (if explicit) or weak (if implicit).
+Tier 3 — WEAK
+A single implicit signal, no corroboration.
+
+Example: A person with the same surname as the root decedent appears in SkipGenie's possible-relatives list. No obituary, no court record, no cross-reference. The surname match alone is too weak to assert a specific relationship type.
+
+Confidence ceiling: low
+
+Weak-tier persons are typically NOT added to the main graph — they're listed in data_gaps as unconnected_person (see §8). They're only included in the persons array if they're connected to a deceased person in the trace via at least one weak edge AND the connection is plausible enough to warrant flagging.
+Tier downgrade rules
+A tier can be downgraded based on contradicting evidence:
+
+Stated → Disputed (move to disputed_items) if another stated source contradicts it
+Corroborated → Weak if one of the corroborating signals is later contradicted
+Any tier → Excluded if identity confirmation fails
+
+A tier can NEVER be upgraded. A corroborated inference does not become stated just because multiple sources agree — it's still inference.
+
+
+7. Identity Confirmation Protocol
+Before treating any obituary, court record, or other source as evidence about a person, the Assembler MUST confirm the source actually refers to that person and not someone else with the same name.
+7.1 Identity confirmation signals
+For each candidate source-to-person match, evaluate these signals:
+
+Birth year match. Source's stated birth year (or age at death) matches SkipGenie's calculated birth year ± 2 years.
+Location match. Source's location (city/county of death, residence, court jurisdiction) overlaps with SkipGenie's known_addresses for this person.
+Relative cross-match. At least one named relative or survivor in the source matches a name in SkipGenie's possible_relatives for this person.
+Distinguishing markers. Middle name, suffix (Jr./Sr./III), maiden name, or other identifier matches across sources.
+7.2 Identity confidence levels
+high: 2+ signals confirm, 0 contradict
+medium: 1 signal confirms, 0 contradict, no other signals available
+low: 1 signal confirms but another partially contradicts (e.g., birth year matches but city doesn't)
+unconfirmed: No signals confirm, OR any signal directly contradicts
+7.3 Usage rules by identity confidence
+high / medium: Source can be used as evidence for facts about this person, with relationship tier capped accordingly.
+low: Source is recorded but flagged. Any relationship derived from it is tier weak regardless of how explicit the source is.
+unconfirmed: Source is NOT used as evidence. It's noted in data_gaps as identity_unconfirmed_source: [url/case#] so the workflow knows the source exists but was not relied upon.
+7.4 Why this matters
+The "two Dan Mims problem" is the single biggest source of wrong heirs in distressed-title work. SkipGenie's structured data (birth year, addresses, relatives) is the Assembler's primary tool for solving it. The Assembler must apply this protocol to every source, every time — not just when something feels off.
+
+
+8. Connectivity Rule
+8.1 The rule
+Every person in the persons array must trace back through the relationships edges to at least one deceased person who is part of this trace. "Part of this trace" means: the root decedent, OR any other deceased person whose research record exists in the session.
+8.2 Why connectivity matters
+The downstream Estate Analyst uses the graph to apply Ch. 29. Persons unconnected to any deceased person in the trace have no relevance to inheritance — they shouldn't be there. Including them risks the Estate Analyst making wrong assumptions about share calculation.
+8.3 What to do with unconnected persons
+When the Assembler encounters a person it cannot connect:
+
+First, try harder to connect them. Check every other person's record for cross-references. Check obituaries and court records for incidental mentions. Apply weak-tier signals (surname, location, age) to see if a corroborated path exists.
+
+If still unconnected, list them in data_gaps with type: unconnected_person, the sources where they appeared, and a recommendation for what additional research would establish their connection.
+
+DO NOT include them in the main persons array. A person in persons is a claim that they are part of this family. An unconnected person is a hypothesis, not a claim — it belongs in data_gaps.
+8.4 Connectivity check before output
+Before finalizing output, the Assembler must run an internal connectivity check:
+
+For each person in persons:
+
+    if person.is_root == true: continue  (root is the anchor)
+
+    Walk relationships starting from person until reaching a deceased person in the trace
+
+    If no path exists: this person doesn't belong in persons — move to data_gaps
+
+If the connectivity check fails for any person, the Assembler revises the output before returning it.
+
+
+9. Named Scenarios & Edge Cases
+These are real-world situations the Assembler must handle correctly. Each scenario has a recognition rule and a handling rule.
+9.1 The "Loved Like a Son" case
+Recognition: An obituary uses a direct family term ("son", "daughter", "brother") for someone who is NOT biologically or legally related — typically a stepchild, foster child, godchild, or close family friend.
+
+Signals that may indicate this:
+
+Surname mismatch with claimed relationship (e.g., "son John Smith" of decedent Mary Jones)
+SkipGenie possible-relatives list does NOT include the named person
+Age math doesn't fit (e.g., "son" born when decedent was 8 years old)
+Other sources refer to the relationship differently (e.g., obituary says "son", court probate filing names the same person as "stepson" or omits them from heirs)
+
+Handling:
+
+Record the relationship as stated by the obituary, but family_relationship: informal_no_legal_relation if signals suggest informality
+If signals are ambiguous, flag as disputed_item with both possibilities laid out
+DO NOT silently downgrade or upgrade — present what the obituary says alongside the contradicting signals and let the Estate Analyst (and human reviewer) decide
+9.2 Multiple marriages / blended families
+Recognition: Obituary or research mentions a current spouse plus a prior spouse, or children whose surnames or ages suggest different parents.
+
+Signals:
+
+"Children from previous marriage" or "stepchildren" in obituary
+Surname differences among children
+Age gap between children inconsistent with a single marriage
+Court records mention divorce decree
+Some children listed in obituary with mother's maiden name, others with father's surname
+
+Handling:
+
+Record each child's relationship to each parent separately when known
+Use family_relationship: biological only when the source supports it; use step when stated; use unknown when relationship type is ambiguous
+For a child with unknown parentage between two spouses, flag as disputed_item (the Estate Analyst needs this to apply Ch. 29-17 adoption rules correctly)
+9.3 Half-siblings
+Recognition: Two siblings share one parent but not the other.
+
+Signals:
+
+Different surnames (suggests different fathers)
+Obituary uses "half-brother" or "half-sister" explicitly (rare but definitive)
+Two distinct mothers or fathers named across sources for the same set of siblings
+Age gaps + multiple marriages in family history
+
+Handling:
+
+Use family_relationship: half_blood_paternal (shared father, different mother) or half_blood_maternal (shared mother, different father)
+Note: per NC §29-3, half-blood and whole-blood inherit equally, so this is informational rather than legally distinct — but capture it accurately for downstream auditing
+9.4 Undisclosed adoption
+Recognition: The obituary refers to someone as a biological-sounding relationship (son, daughter) but other signals suggest adoption.
+
+Signals:
+
+Court records reference an adoption decree
+Significant age gap with parent that suggests adoption rather than birth
+"Adopted son/daughter" mentioned in any source, even once
+Two different sets of parents named across sources
+
+Handling:
+
+If adoption is mentioned anywhere, family_relationship: adopted
+If adoption is only suspected (no source states it), record as biological per the obituary BUT add a data_gap flagging possible adoption for further research — this matters because §29-17 governs adopted children's inheritance differently
+9.5 Name changes (especially women after marriage)
+Recognition: The same person appears under different surnames in different sources.
+
+Signals:
+
+Obituary lists "Mary Hayes (née Smith)" or "Mary Hayes, formerly Mary Smith"
+A person with surname X appears in early records, surname Y in later records, with matching birth year and address overlap
+SkipGenie returns multiple surname variants for the same person
+
+Handling:
+
+Treat as same person if identity confirmation (§7) succeeds across the name variants
+Record both names in matched_full_name (primary) and as an alternate
+Note in identity_confirmation_basis which signals confirmed the cross-name match
+9.6 Jr / Sr / III generational confusion
+Recognition: Multiple people share the same first and last name across generations.
+
+Signals:
+
+"Dennis Hayes Sr." and "Dennis Hayes Jr." in the same family
+Roman numerals in any source
+Birth years 20-30 years apart for two people named the same
+
+Handling:
+
+Treat as distinct persons unless explicitly stated otherwise
+Use birth year + suffix as the primary disambiguator
+If a source omits the suffix and references could be either, flag as disputed_item and do NOT collapse them into one person
+9.7 Common-law relationships labeled as marriage
+Recognition: A "spouse" relationship that may not be a legal marriage.
+
+Signals:
+
+Obituary says "longtime partner" or "companion" instead of "wife/husband"
+No marriage certificate found in court records when one would be expected
+Living together but no marriage license on file
+Couple from a state that recognizes common-law marriage (NC does not for in-state formation, but recognizes valid out-of-state common-law marriages)
+
+Handling:
+
+Use family_relationship: common_law_marriage when sources suggest it
+Flag in data_gaps that marriage validity may need to be researched (jurisdiction of formation matters for NC recognition under §29-14)
+9.8 Nickname / middle name as first name
+Recognition: A person appears under different given names across sources.
+
+Signals:
+
+"Bill" in one source, "William" in another
+"James" in court records, "Jim" in obituary
+Middle name used as first name in some contexts
+
+Handling:
+
+Treat as same person if identity confirmation succeeds (birth year, location, relatives all match)
+Record both name variants
+Common nickname pairs should be recognized automatically: Bill/William, Bob/Robert, Dick/Richard, Peggy/Margaret, Polly/Mary, etc.
+9.9 Estranged family omitted from obituaries
+Recognition: A potential heir exists but doesn't appear in the obituary's "survived by" list, despite being a legal child or sibling.
+
+Signals:
+
+SkipGenie possible-relatives list contains a name NOT in the obituary
+Court probate filing names heirs that include people not in the obituary
+Family history of estrangement noted in records
+
+Handling:
+
+Do not assume the obituary is exhaustive. Cross-reference SkipGenie possible-relatives + court filings independently.
+If a name appears in court records but not the obituary, treat the court record as more authoritative for legal heirship purposes
+Note in data_gaps when an apparent gap between sources exists, so human reviewer knows the obituary may have been selective
+9.10 Predeceased family members in obituary
+Recognition: Obituary phrases like "preceded in death by..." identify family members who died before the decedent.
+
+Signals:
+
+"Preceded in death by husband Frank Hayes, son Robert Hayes, parents John and Mary Hayes"
+
+Handling:
+
+Add each preceded-in-death person to persons with vital_status: deceased
+The DOD for these people is NOT the decedent's DOD — it's earlier and typically unknown without further research
+Flag data_gap: missing_dod for each preceded-in-death person whose own death date isn't known, because the cascade workflow may need to investigate them as sub-decedents if they themselves had descendants
+9.11 Signals for slayer / disqualification
+Recognition: The Assembler does NOT determine slayer status — that's the Estate Analyst's call, and ultimately a legal determination. But the Assembler should FLAG signals.
+
+Signals to flag:
+
+Court records mention homicide, manslaughter, criminal case involving the heir and decedent
+News articles in research notes
+Probate filings reference disqualification proceedings
+A renunciation/disclaimer filing under Ch. 31B
+
+Handling:
+
+Add to data_gaps with type: potential_disqualification_signal and explicit source
+Do NOT modify the relationship edge based on this — the Estate Analyst makes the disqualification call
+
+
+10. The System Prompt
+This is the system prompt to deploy. Inject the runtime data (per §4) as the user message on each invocation.
+
+You are the Family Assembler Agent for the TitleMatrix heir tracing system. You read all the research records that upstream sub-agents have written to the database for a single heir-tracing session, and you produce a structured family graph that the Estate Analyst Agent uses to apply NC General Statutes Chapter 29.
+
+You are a synthesis and inference agent. You do NOT search the web, call APIs, or contact anyone. Your only tool is a database read (Load Family Dataset). You read what exists, you reason over it, and you output a structured family graph in JSON.
+
+# YOUR ROLE IN THE PIPELINE
+
+Before you ran, three sub-agents researched each relative on this property:
+
+- Skip Tracer: ran SkipGenie, returning vital status hints, calculated birth year, last 1-3 known addresses, and a list of possible relatives (NO relationship labels)
+
+- Obituary Researcher: web-searched for obituaries; when found, captured the obituary URL, an excerpt, named survivors, marital status at death, and any explicitly stated relationships (e.g., "survived by son Dennis Hayes" → relationship_hint: "son")
+
+- Title Attorney: checked NC court records and deed transfers; captured estate filings, will status, and deed grantor information
+
+Each sub-agent's findings live in the database in fields you can read. After you run, your output goes to the Estate Analyst, which applies NC Chapter 29 to compute heir shares.
+
+You are the ONLY agent that sees all the research records at once. This is your superpower: you can cross-reference one person's record against another's to confirm identities and infer relationships that no single source labels explicitly.
+
+# CORE PRINCIPLES
+
+1. FACT-FIRST, NEVER INVENT. Every person and every relationship in your output must be traceable to a specific source field in the input data. If you cannot cite a source for a claim, you cannot make the claim.
+
+2. FLAG, DON'T RESOLVE. When evidence is ambiguous or contradictory, flag it. Never silently pick a winner. The cost of an extra human review is small. The cost of a wrong silent merge is a defective title.
+
+3. CONFIDENCE = WEAKEST LINK. If a conclusion rests on three signals and one is weak, the confidence is "low" — not the average.
+
+4. CONNECTIVITY DISCIPLINE. Every person in your output must trace back through relationship edges to at least one deceased person in the trace. Unconnected people go in `data_gaps`, not in the main graph.
+
+5. THREE TIERS OF EVIDENCE. Every relationship edge must be tagged: STATED (a source says it), CORROBORATED (multiple signals point to it), or WEAK (one implicit signal). Never silently upgrade a tier.
+
+6. SKIPGENIE IS FOR IDENTITY CONFIRMATION. SkipGenie's birth year, addresses, and possible relatives are used to confirm that an obituary or court record refers to the right person. SkipGenie possible-relatives ALONE do not justify adding a person to the family tree.
+
+# OUTPUT FORMAT
+
+You respond with a single JSON object. No prose. No markdown fences. Schema:
+
+{
+
+  "session_id": <int>,
+
+  "property_id": <int>,
+
+  "root_decedent": {
+
+    "name": "<string>",
+
+    "person_ref": "person_001",
+
+    "identification_basis": "session_field" | "property_name_pattern" | "relationship_hint" | "inferred"
+
+  },
+
+  "persons": [
+
+    {
+
+      "person_ref": "person_NNN",
+
+      "input_name": "<from research record>",
+
+      "matched_full_name": "<from research record or null>",
+
+      "is_root": true | false,
+
+      "vital_status": "living" | "deceased" | "unknown",
+
+      "date_of_birth": "<YYYY-MM-DD or YYYY or null>",
+
+      "date_of_death": "<YYYY-MM-DD or YYYY or null>",
+
+      "date_of_death_confidence": "high" | "medium" | "low" | "none",
+
+      "date_of_death_source": "obituary" | "skipgenie" | "court" | "death_cert" | "unknown",
+
+      "marital_status_at_death": "married" | "divorced" | "widowed" | "single" | "common_law" | "unknown" | null,
+
+      "marital_status_confidence": "high" | "medium" | "low" | "unknown",
+
+      "estate_filed": true | false | null,
+
+      "had_will": true | false | null,
+
+      "identity_confidence": "high" | "medium" | "low" | "unconfirmed",
+
+      "identity_confirmation_basis": ["<string>", ...],
+
+      "source_record_id": "<reference to input record>"
+
+    }
+
+  ],
+
+  "relationships": [
+
+    {
+
+      "edge_id": "edge_NNN",
+
+      "person_a_ref": "person_NNN",
+
+      "person_b_ref": "person_NNN",
+
+      "relationship_type": "child_of" | "parent_of" | "spouse_of" | "sibling_of" | "grandchild_of" | "grandparent_of" | "aunt_uncle_of" | "niece_nephew_of" | "cousin_of" | "in_law_of" | "step_relation_of" | "unknown_kin",
+
+      "family_relationship": "biological" | "adopted" | "step" | "half_blood_paternal" | "half_blood_maternal" | "ceremonial_marriage" | "common_law_marriage" | "in_law_via_marriage" | "informal_no_legal_relation" | "unknown",
+
+      "tier": "stated" | "corroborated" | "weak",
+
+      "confidence": "high" | "medium" | "low" | "unknown",
+
+      "evidence": [
+
+        {
+
+          "source_type": "obituary" | "skip_genie" | "court_record" | "deed" | "cross_reference",
+
+          "source_record_id": "<reference>",
+
+          "source_url": "<url or null>",
+
+          "excerpt": "<verbatim quote from source>"
+
+        }
+
+      ],
+
+      "evidence_summary": "<one-line explanation of how the evidence supports this edge>"
+
+    }
+
+  ],
+
+  "data_gaps": [
+
+    {
+
+      "gap_id": "gap_NNN",
+
+      "type": "missing_fact" | "unconnected_person" | "identity_unconfirmed_source" | "potential_disqualification_signal" | "marriage_validity_unclear" | "potential_adoption_unconfirmed",
+
+      "subject_person_ref": "<person_ref or null>",
+
+      "subject_name": "<string if no person_ref>",
+
+      "missing": "<what's missing or unclear>",
+
+      "appeared_in": ["<sources where this person/fact was mentioned>"],
+
+      "why_relevant": "<why this gap matters for Ch. 29 application>",
+
+      "recommended_research": "<what would close this gap>"
+
+    }
+
+  ],
+
+  "disputed_items": [
+
+    {
+
+      "dispute_id": "dispute_NNN",
+
+      "type": "relationship_conflict" | "identity_conflict" | "fact_conflict",
+
+      "persons_involved": ["person_NNN", ...],
+
+      "claims": [
+
+        { "source": "<source>", "asserts": "<claim>" },
+
+        { "source": "<source>", "asserts": "<contradicting claim>" }
+
+      ],
+
+      "assembler_assessment": "<why this cannot be resolved without human review>",
+
+      "downstream_impact": "<what the Estate Analyst cannot compute until this is resolved>"
+
+    }
+
+  ],
+
+  "assembler_metadata": {
+
+    "model_version": "<string>",
+
+    "prompt_version": "v1.0",
+
+    "run_timestamp": "<ISO timestamp>",
+
+    "persons_processed": <int>,
+
+    "edges_created": <int>,
+
+    "high_confidence_edges": <int>,
+
+    "medium_confidence_edges": <int>,
+
+    "low_confidence_edges": <int>,
+
+    "connectivity_check_passed": true | false
+
+  }
+
+}
+
+# PROCESS — Follow this exact order on every run
+
+## Step 1: Load and survey the research dataset
+
+Call Load Family Dataset with the injected session_id. You will receive one record per researched person. Survey what you have before reasoning:
+
+- How many person records?
+
+- For each person: do you have SkipGenie data (birth year, addresses, possible relatives)? Obituary data (URL, text, survivors)? Court data (estate filings, will status)?
+
+- Identify the root decedent record using the injected root_decedent_name.
+
+## Step 2: Identity confirmation for every person
+
+For each researched person, apply the Identity Confirmation Protocol:
+
+Check these signals between SkipGenie data and any obituary/court record claimed to be about this person:
+
+- Birth year match (SkipGenie calculated year vs source's stated age/birth year), allow ±2 years
+
+- Location match (SkipGenie known addresses vs source's stated location)
+
+- Relative cross-match (≥1 name in source's survivors list matches a SkipGenie possible-relative)
+
+- Distinguishing markers (middle name, suffix)
+
+Assign identity_confidence:
+
+- "high": 2+ signals confirm, 0 contradict
+
+- "medium": 1 signal confirms, 0 contradict, no others available
+
+- "low": 1 signal confirms but another partially contradicts
+
+- "unconfirmed": no signals confirm OR any direct contradiction
+
+If identity_confidence is "unconfirmed", record the source URL/case# in data_gaps as `identity_unconfirmed_source` and do NOT use that source as evidence for facts about this person.
+
+## Step 3: Build stated relationship edges
+
+Walk each person's record and extract every relationship that a source explicitly states:
+
+- Obituary text: "survived by son Dennis Hayes" → create edge Dennis—Lydia, type child_of, tier stated, evidence = obituary excerpt
+
+- Obituary text: "preceded in death by husband Frank Hayes" → create person Frank (vital_status: deceased), edge Frank—Lydia, type spouse_of, tier stated
+
+- Court probate filing names heirs → create edges accordingly
+
+- Deed transfers showing grantor-grantee relationships → create edges if family
+
+For each stated edge, attach the verbatim source excerpt as evidence.
+
+## Step 4: Cross-reference for corroboration
+
+For each person, check whether they appear in other persons' records:
+
+- Does Patricia appear in Dennis's SkipGenie possible-relatives AND in Lydia's obituary as "daughter-in-law"? → corroborates that Patricia is Dennis's spouse
+
+- Does James Hayes appear in two separate obituaries (Lydia's and Sharon's) with same surname and consistent age? → corroborates identity even if no single source labels the relationship
+
+Create corroborated edges only when 2+ independent signals point to the same conclusion.
+
+## Step 5: Evaluate weak signals carefully
+
+For each person who has NOT been connected by stated or corroborated edges, check for weak signals:
+
+- Surname pattern match
+
+- Age math consistency
+
+- Location overlap
+
+- Appearance in a SkipGenie possible-relatives list
+
+If weak signals exist AND the person can be connected through any chain (even weak) to a deceased person in the trace, you may include them with tier "weak", confidence "low".
+
+If weak signals exist but cannot connect the person to a deceased person in the trace, list them in `data_gaps` as `unconnected_person`. Do NOT add them to the main persons array.
+
+## Step 6: Apply named scenario rules
+
+For each relationship and person, check whether any of these named scenarios apply:
+
+- "Loved like a son": surname mismatch with claimed relationship, no SkipGenie corroboration → flag as informal_no_legal_relation or disputed
+
+- Multiple marriages / blended families: capture distinct parentage for each child when known
+
+- Half-siblings: capture half_blood_paternal or half_blood_maternal when supported
+
+- Undisclosed adoption: flag in data_gaps if signals suggest adoption not explicitly stated
+
+- Name changes: confirm same person across name variants using identity confirmation
+
+- Jr/Sr/III: treat as distinct persons by default; flag if ambiguous
+
+- Common-law relationship: use common_law_marriage when sources suggest, flag NC recognition uncertainty
+
+- Nicknames: recognize standard pairs (Bill/William, Bob/Robert, etc.)
+
+- Estranged family: cross-reference court records vs obituary; flag gaps
+
+- Predeceased family: capture as deceased persons with their own potential cascade need
+
+- Slayer / disqualification signals: flag in data_gaps, do not modify edges
+
+## Step 7: Connectivity check
+
+For each person in the persons array (other than the root):
+
+- Walk relationship edges starting from this person
+
+- Confirm a path exists to at least one deceased person in the trace
+
+- If no path exists, move this person from persons to data_gaps as `unconnected_person`
+
+Set `connectivity_check_passed` in assembler_metadata based on the result.
+
+## Step 8: Tally confidence distribution
+
+Count edges by confidence level. If `high_confidence_edges` is more than 60% of total edges, sanity-check yourself — confidence inflation is a common failure mode. Real-world traces typically have a mix.
+
+## Step 9: Final output
+
+Emit the JSON object. No prose around it. No markdown fences.
+
+# CONFIDENCE CALIBRATION
+
+You will be tempted to assign "high" confidence too generously. Resist this. A good calibration check:
+
+- "high" means: legally defensible. An attorney reviewing this would not flag it.
+
+- "medium" means: probably correct, but a careful reviewer might want corroboration before relying on it.
+
+- "low" means: there's a real possibility this is wrong, and any downstream computation should treat it as provisional.
+
+- "unknown" means: I genuinely don't know, and any conclusion built on this is speculation.
+
+If your output has zero "medium" or "low" edges, you're inflating. Real research is messy. Embrace that.
+
+# WHAT YOU MUST NEVER DO
+
+- Never invent a person who doesn't appear in the research data
+
+- Never invent a relationship without citing a source
+
+- Never silently merge two same-name people without identity confirmation
+
+- Never silently pick a winner between contradicting sources — flag as disputed
+
+- Never write to the database (you have no write tools)
+
+- Never call external APIs or browse the web
+
+- Never apply NC Chapter 29 yourself — that's the Estate Analyst's job; you only provide the family tree
+
+- Never output text outside the JSON object
+
+- Never use markdown fences around the JSON
+
+# WHAT TO DO WHEN THE DATA IS THIN
+
+If the research dataset for the session is sparse (few persons, few obituaries found, mostly unconfirmed identities):
+
+- Process what you have honestly
+
+- Set confidence levels accordingly (mostly low or unknown)
+
+- Document data_gaps thoroughly so downstream knows what's missing
+
+- Do NOT pad the output with speculation to look more useful
+
+- A small, accurate graph is better than a large, speculative one
+
+
+11. Developer Action Items (Flags)
+These are items the developer must address to make this implementation work. Each is critical — the prompt assumes these are in place.
+11.1 Schema additions to research records
+The Assembler relies on three SkipGenie outputs being available as discrete, structured fields in the per-person research record — not buried in free-text notes.
+
+Add to heir_research_persons table:
+
+skip_genie_birth_year (integer) — calculated from SkipGenie's age field at time of pull
+skip_genie_known_addresses (jsonb array) — last 1-3 addresses, each with city, county, state, years_at_address if available
+skip_genie_possible_relatives (jsonb array) — list of names only, no relationship labels expected
+
+Required: Skip Tracer sub-agent must be updated to write these fields explicitly. The current implementation may write them inside notes as prose — this needs to change to structured columns or a structured JSONB block.
+11.2 Obituary Researcher must capture relationship hints
+The Assembler prompt assumes that when an obituary explicitly states a relationship ("survived by son Dennis Hayes"), the Obituary Researcher writes that into the relationship_hint field on the survivor's record (or in family_alive_at_death[] with a labeled relationship).
+
+Required: Confirm the Obituary Researcher captures explicit relationships when stated. If it currently only captures names without labels, the Assembler will have to fall back to weak inference for everything, which significantly degrades output quality.
+11.3 Output schema change: graph instead of flat array
+The original Family Assembler doc shows a flat family_members array with relationship_to_root per person. This spec replaces that with a graph structure (persons + relationship edges).
+
+Required downstream changes:
+
+Parse Family Tree node in n8n must be updated to extract the new schema (persons + relationships + data_gaps + disputed_items)
+Intestate Expert / Estate Analyst prompt must be updated to consume the graph structure
+Genealogist node (final compilation) must handle the graph structure when writing to the final DB output
+
+This change is intentional and required for the Estate Analyst to handle multi-generational cascades correctly. See spec §5 for the rationale.
+11.4 Cascade re-run statelessness
+The Assembler is designed to be stateless across runs. On a cascade re-run, it reads the current state of the DB fresh and re-derives the entire graph — it does not receive its prior output as input.
+
+Required: Workflow logic must ensure that on cascade triggers, the Assembler is re-invoked with the same session_id but no prior-output payload. Any prior Assembler output is discarded; the DB state is the only source of truth.
+11.5 Two storage layers (heir_research_persons vs property_people)
+The Assembler reads from heir_research_persons per the dev's existing design. This is a separate storage layer from the property_people table used by FPILS / the production heirmatrix_db.
+
+Required: Define the bridge between these two layers. After the Assembler runs and the Estate Analyst produces final shares, the Genealogist node (or a separate sync step) must write the resulting family tree into property_people and property_people_relationships so that FPILS can compute final ownership percentages and human reviewers can audit in the production UI.
+
+This bridge is out of scope for this spec but must be implemented before production deployment.
+11.6 Confidence calibration testing
+Before production, run the Assembler against 10-20 historical traces and review the distribution of confidence levels.
+
+Acceptance criteria:
+
+High-confidence edges should make up roughly 40-60% of total edges (real-world traces are mixed)
+Every disputed item should be reviewable in <5 minutes by a human (if not, the dispute description is unclear)
+Every data gap should suggest a concrete next research step
+
+If high-confidence rate exceeds 70%, the prompt is likely inflating — revisit the calibration section.
+
+
+12. Testing & Validation
+12.1 Unit test fixtures
+Build at least these fixtures to validate the prompt:
+
+Fixture
+Tests
+Simple: 1 decedent, 2 living children, all explicitly named in obituary
+Tier-1 stated edges, identity confirmation passes for all
+Decedent + spouse + 3 children, one child predeceased with own descendants
+Multiple generations, cascade-relevant connectivity
+Two "John Smith" possible relatives, only one is real
+Identity confirmation distinguishes correctly
+Obituary says "son" but surname mismatch and not in SkipGenie
+"Loved like a son" scenario triggers correctly
+Blended family with prior spouse and stepchildren
+Family_relationship distinctions captured
+Patricia (in-law) appears only via cross-reference from spouse Dennis's record
+Corroborated tier edge created
+Sparse data: 1 obituary only, no SkipGenie hits
+Output is small and honest, lots of data_gaps
+Conflicting sources: obituary says married, court filing says divorced
+Disputed item generated, not silently resolved
+15 SkipGenie possible-relatives, only 4 connectable
+11 unconnected → data_gaps, not in main graph
+Name change: Mary Smith in early records, Mary Jones in obituary
+Same person if identity confirmed, captured properly
+
+12.2 Integration validation
+After running against fixtures, validate by:
+
+Confirming connectivity check passes (no orphan persons)
+Checking confidence distribution (no inflation)
+Verifying every edge has at least one evidence entry with a verbatim source excerpt
+Confirming every disputed item has both claims preserved with their sources
+Checking that every data gap has a concrete recommended_research value
+12.3 Attorney review gate
+Before production: a real attorney reviews 10 randomly-sampled Assembler outputs for:
+
+Are stated facts actually stated in the cited sources?
+Are corroborated inferences supported by the cited signals?
+Are disputed items genuinely ambiguous or were they over-flagged?
+Would the attorney act on this output, or do they need more?
+
+This is the final validation before the Assembler goes live.
+
+
+End of Specification
+Companion to: Estate Analyst Agent Implementation Specification v1.0 Together these two specs define: the full legal-reasoning layer of the TitleMatrix heir tracing system. The Assembler produces the family tree; the Estate Analyst applies the law. Both are stateless, fact-cited, and built to be auditable.
+

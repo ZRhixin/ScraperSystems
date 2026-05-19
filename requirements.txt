@@ -6,3 +6,6 @@ playwright
 playwright-stealth
 python-dotenv
 2captcha-python
+psycopg2-binary
+anthropic
+pymupdf
