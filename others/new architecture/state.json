@@ -234,26 +234,12 @@
     },
     {
       "parameters": {
-        "toolDescription": "### Verify Write\n```\nWrites the verdict to the database.\nInput: { conclusion_id, verdict: \"approved\" | \"objection_raised\" | \"flagged_for_human\", objections? }\n```",
+        "toolDescription": "### Verify Write\nWrites your verdict to the database. Call this after completing your review.\n\nYou MUST pass all three parameters explicitly in your tool call:\n- conclusion_id (integer, REQUIRED): the conclusion ID you are reviewing\n- verdict (string, REQUIRED): must be exactly one of \"approved\", \"objection_raised\", or \"flagged_for_human\"\n- objections (array or null, REQUIRED): array of objection objects if verdict is \"objection_raised\", otherwise pass null\n\nExample: { \"conclusion_id\": 7, \"verdict\": \"approved\", \"objections\": null }",
         "method": "POST",
         "url": "http://127.0.0.1:8000/verify/write",
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "conclusion_id",
-              "value": "={{ $fromAI('conclusion_id', 'The conclusion ID being reviewed') }}"
-            },
-            {
-              "name": "verdict",
-              "value": "={{ $fromAI('verdict', 'approved | objection_raised | flagged_for_human') }} "
-            },
-            {
-              "name": "objections",
-              "value": "={{ $fromAI('objections', 'Array of objection objects if verdict is objection_raised, otherwise null', 'json') }}"
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"conclusion_id\": \"{{ $fromAI('conclusion_id', 'The conclusion ID being reviewed') }}\",\n  \"verdict\": \"{{ $fromAI('verdict', 'approved | objection_raised | flagged_for_human') }}\",\n  \"objections\": {{ $fromAI('objections', 'Array of objection objects if verdict is objection_raised, otherwise null', 'json') ?? null }}\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequestTool",
