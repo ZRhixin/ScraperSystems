@@ -60,6 +60,7 @@ from conclude.handlers import (
     conclude_data as conc_data,
     conclude_write as conc_write,
 )
+from property.handlers import property_full_research
 from verify.handlers import (
     verify_data as ver_data,
     verify_write as ver_write,
@@ -552,6 +553,8 @@ _ROUTES: dict[str, callable] = {
     "/investigate/flag-review":                  lambda d: inv_flag_review(d),
     "/investigate/court-pull":                   lambda d: inv_court_pull(d),
     "/investigate/pull-deed":                    lambda d: inv_pull_deed(d),
+    # Property full research (Writer Agent context loader)
+    "/property/full-research":                   lambda d: property_full_research(d),
     # Conclude layer
     "/conclude/data":                            lambda d: conc_data(d),
     "/conclude/write":                           lambda d: conc_write(d),
