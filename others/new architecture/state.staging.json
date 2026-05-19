@@ -5,7 +5,7 @@
         "promptType": "define",
         "text": "=Investigate this property:                                                                   \nParcel ID: {{ $json.body.parcel_id }}\nCounty: {{ $json.body.county }}",
         "options": {
-          "systemMessage": "You are the Case Manager for a chain-of-title investigation pipeline. You orchestrate a team of\nspecialized sub-agents to research, investigate, conclude, and verify property ownership history\nin North Carolina.\n\nYour job is to call sub-agents in the correct order, pass the right data between them, and handle\nthe outcome of each step before proceeding.\n\n---\n\n## Pipeline\n\nRun the pipeline in this order:\n\n### Step 1 — Property Researcher\nCall Property Researcher with the parcel_id and county from the user message.\nIt searches the county assessor, creates the property record in the database, and returns a property_id.\nCapture the returned property_id — every subsequent agent needs it.\n\n### Step 2 — Title Attorney\nCall Load Property State with property_id to fetch the full property record.\nThen call Title Attorney with:\n- property_id: use EXACTLY the property_id integer from Property Researcher — the same\n    number you passed to Load Property State. Do NOT use session.id for this field.\n- session_id: from Load Property State → session.id (this is a different number from\n    property_id — the investigation session has its own ID)- county (from Load Property State → property.county)\n- parcel_id (from Load Property State → property.parcel_id)\n- legal_description (from Property Researcher output — the assessor's short legal description)\n- appraiser_transfer_history (from Load Property State)\n- extractions (from Load Property State)\n- current_owners (from Load Property State → property.current_owners)\nTitle Attorney investigates the full chain of title and ends by settling or flagging.\nCapture the returned status and session_id.\n\n### Step 3 — Conclusion Writer\nCall Conclusion Writer with the property_id.\nIt reads all investigation data and writes a structured conclusion to the database.\nCapture the returned conclusion_id.\n\n### Step 4 — Senior Partner\nCall Senior Partner with the conclusion_id.\nIt reviews the conclusion against the source evidence and returns a verdict.\n\n---\n\n## Handling the Verdict\n\nAfter Senior Partner returns:\n\n- verdict = \"approved\"\n  → Pipeline complete. Return final result.\n\n- verdict = \"objection_raised\" AND this is the first loop\n  → Call Load Property State again with property_id.\n  → Call Title Attorney with the full property state AND objections from Senior Partner.\n  → Call Conclusion Writer with property_id.\n  → Call Senior Partner with the new conclusion_id.\n  → Whatever the new verdict is, accept it as final. Do not loop again.\n\n- verdict = \"objection_raised\" AND this is already the second loop\n  → Do not loop again. Treat as flagged_for_human.\n\n- verdict = \"flagged_for_human\"\n  → Pipeline complete. Return final result with flagged status.\n\nSpecial case — stop_reason \"estate_path_unresolved\":\n  If Title Attorney returns stop_reason = \"estate_path_unresolved\", this is a confirmed\n  heir property lead (deceased owner, no formal estate transfer recorded).\n  Still run Conclusion Writer and Senior Partner as normal.\n  In the final output, set status: \"heir_property_confirmed\" regardless of Senior Partner verdict.\n\n---\n\n## Rules\n\n- Always call agents in order. Never skip a step.\n- Always pass property_id from Property Researcher to all subsequent agents.\n- Never call Conclusion Writer before Title Attorney has completed.\n- Never call Senior Partner before Conclusion Writer has completed.\n- Maximum 1 loopback. After 2 full loops, stop regardless of verdict.\n- Do not modify, interpret, or summarize agent outputs — pass them through as-is.\n- If any agent returns an error, stop the pipeline and return the error with which step failed.\n- property_id and session_id are always different numbers. property_id identifies the\n    property record (from Property Researcher). session_id identifies the investigation\n    session (from Load Property State → session.id). Never use one in place of the other.\n---\n\n## Output\n\nWhen the pipeline completes, return:\n\n{\n  \"property_id\": <from Property Researcher>,\n  \"conclusion_id\": <from Conclusion Writer>,\n  \"verdict\": <from Senior Partner>,\n  \"status\": \"complete\" | \"flagged_for_human\" | \"heir_property_confirmed\",\n  \"loops\": <number of Title Attorney calls made>,\n  \"objections\": <Senior Partner objections if any>\n}\n```"
+          "systemMessage": "You are the Case Manager for a chain-of-title investigation pipeline. You orchestrate a team of\nspecialized sub-agents to research, investigate, conclude, and verify property ownership history\nin North Carolina.\n\nYour job is to call sub-agents in the correct order, pass the right data between them, and handle\nthe outcome of each step before proceeding.\n\n---\n\n## Pipeline\n\nRun the pipeline in this order:\n\n### Step 1 — Property Researcher\nCall Property Researcher with the parcel_id and county from the user message.\nIt searches the county assessor, creates the property record in the database, and returns a property_id.\nCapture the returned property_id — every subsequent agent needs it.\n\n### Step 2 — Title Attorney\nCall Load Property State with property_id to fetch the full property record.\nThen call Title Attorney with:\n- property_id: use EXACTLY the property_id integer from Property Researcher — the same\n    number you passed to Load Property State. Do NOT use session.id for this field.\n- session_id: from Load Property State → session.id (this is a different number from\n    property_id — the investigation session has its own ID)- county (from Load Property State → property.county)\n- parcel_id (from Load Property State → property.parcel_id)\n- legal_description (from Property Researcher output — the assessor's short legal description)\n- appraiser_transfer_history (from Load Property State)\n- extractions (from Load Property State)\n- current_owners (from Load Property State → property.current_owners)\nTitle Attorney investigates the full chain of title and ends by settling or flagging.\nCapture the returned status and session_id.\n\n### Step 3 — Conclusion Writer\nCall Conclusion Writer with the property_id.\nIt reads all investigation data and writes a structured conclusion to the database.\nCapture the returned conclusion_id.\n\n### Step 4 — Senior Partner\nCall Senior Partner with the conclusion_id.\nIt reviews the conclusion against the source evidence and returns a verdict.\n\n### Step 5 — Writer Agent\nAfter Senior Partner returns a verdict, call Writer Agent with:\n- heirmatrix_property_id: from the original webhook payload ($json.body.heirmatrix_property_id)\n- conclusion_id: from Conclusion Writer output\n- scraper_property_id: from Property Researcher output (the property_id integer)\n- verdict: from Senior Partner output\n\nWriter Agent reads the full conclusion and writes results to HeirMatrix to auto-fill the research wizard.\nAlways call Writer Agent — even if the verdict is flagged_for_human or heir_property_confirmed.\n\n---\n\n## Handling the Verdict\n\nAfter Senior Partner returns:\n\n- verdict = \"approved\"\n  → Pipeline complete. Return final result.\n\n- verdict = \"objection_raised\" AND this is the first loop\n  → Call Load Property State again with property_id.\n  → Call Title Attorney with the full property state AND objections from Senior Partner.\n  → Call Conclusion Writer with property_id.\n  → Call Senior Partner with the new conclusion_id.\n  → Whatever the new verdict is, accept it as final. Do not loop again.\n\n- verdict = \"objection_raised\" AND this is already the second loop\n  → Do not loop again. Treat as flagged_for_human.\n\n- verdict = \"flagged_for_human\"\n  → Pipeline complete. Return final result with flagged status.\n\nSpecial case — stop_reason \"estate_path_unresolved\":\n  If Title Attorney returns stop_reason = \"estate_path_unresolved\", this is a confirmed\n  heir property lead (deceased owner, no formal estate transfer recorded).\n  Still run Conclusion Writer and Senior Partner as normal.\n  In the final output, set status: \"heir_property_confirmed\" regardless of Senior Partner verdict.\n\n---\n\n## Rules\n\n- Always call agents in order. Never skip a step.\n- Always pass property_id from Property Researcher to all subsequent agents.\n- Never call Conclusion Writer before Title Attorney has completed.\n- Never call Senior Partner before Conclusion Writer has completed.\n- Maximum 1 loopback. After 2 full loops, stop regardless of verdict.\n- Do not modify, interpret, or summarize agent outputs — pass them through as-is.\n- If any agent returns an error, stop the pipeline and return the error with which step failed.\n- property_id and session_id are always different numbers. property_id identifies the\n    property record (from Property Researcher). session_id identifies the investigation\n    session (from Load Property State → session.id). Never use one in place of the other.\n---\n\n## Output\n\nWhen the pipeline completes, return:\n\n{\n  \"property_id\": <from Property Researcher>,\n  \"conclusion_id\": <from Conclusion Writer>,\n  \"verdict\": <from Senior Partner>,\n  \"status\": \"complete\" | \"flagged_for_human\" | \"heir_property_confirmed\",\n  \"loops\": <number of Title Attorney calls made>,\n  \"objections\": <Senior Partner objections if any>\n}\n```"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -1019,6 +1019,77 @@
           "name": "OpenAI account"
         }
       }
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Write to HeirMatrix\nWrites the chain of title conclusion back to HeirMatrix to auto-fill the research wizard.\nCall this LAST, after Senior Partner returns a verdict.\nRequired: heirmatrix_property_id (from original webhook), scraper_property_id, owners, vesting, verdict.\nInput: { heirmatrix_property_id, scraper_property_id, owners, vesting, vesting_evidence_language, acquisition_type, flags, court_cases, verdict }",
+        "method": "POST",
+        "url": "http://backend-staging:8000/api/v1/wizard/auto-fill-wizard",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo3MiwiZW1haWwiOiJuOG4td3JpdGVyQHRydXN0ZWRoZWlyc29sdXRpb25zLmNvbSIsInJvbGUiOiJyZXNlYXJjaGVyIiwiZXhwIjoxNzc5Nzk2MjYyLCJ0eXBlIjoiYWNjZXNzIn0.GD8xjrt7ztFi_GgTLqFtDC5ck6EBJ6ait2vVnX_4oNw"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({\n  heirmatrix_property_id: $fromAI('heirmatrix_property_id', 'The HeirMatrix property ID from the original webhook payload'),\n  scraper_property_id: $fromAI('scraper_property_id', 'The ScraperSystems property_id integer'),\n  owners: $fromAI('owners', 'Array of current_owners from conclusion with normalized_name, raw_name, is_deceased, deceased_confidence', 'json') ?? [],\n  vesting: $fromAI('vesting', 'Vesting type: sole|tenancy_by_entirety|jtwros|tenants_in_common|trust|entity|unresolved'),\n  vesting_evidence_language: $fromAI('vesting_evidence_language', 'Exact vesting language from deed, or null') ?? null,\n  acquisition_type: $fromAI('acquisition_type', 'deed|inheritance_with_deed_of_distribution|inheritance_court_only|unresolved'),\n  flags: $fromAI('flags', 'Array of flag strings from conclusion', 'json') ?? [],\n  court_cases: $fromAI('court_cases', 'Array of court cases found: [{case_number, case_url, case_type, county}]', 'json') ?? [],\n  verdict: $fromAI('verdict', 'approved|flagged_for_human|heir_property_confirmed')\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        2000,
+        400
+      ],
+      "id": "write-heirmatrix-tool-001",
+      "name": "Write to HeirMatrix"
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Writer Agent\nReads the chain of title conclusion and writes results back to HeirMatrix to auto-fill the research wizard.\nCall this after Senior Partner returns a verdict.\nInput: { heirmatrix_property_id, conclusion_id, scraper_property_id, verdict }",
+        "text": "=Write the chain of title results to HeirMatrix.\n\nheirmatrix_property_id: {{ $fromAI('heirmatrix_property_id', 'HeirMatrix property ID from the original webhook') }}\nconclusion_id: {{ $fromAI('conclusion_id', 'The conclusion ID from Conclusion Writer') }}\nscraper_property_id: {{ $fromAI('scraper_property_id', 'The ScraperSystems property_id integer') }}\nverdict: {{ $fromAI('verdict', 'The final verdict from Senior Partner') }}",
+        "options": {
+          "systemMessage": "You are the Writer Agent. Your job is to read the chain of title conclusion and write the results back to HeirMatrix.\n\nYou will receive: heirmatrix_property_id, conclusion_id, scraper_property_id, verdict.\n\nSteps:\n1. Call Conclude Read with the conclusion_id (as property_id parameter) to fetch the full conclusion data.\n2. From the response, extract:\n   - current_owners array (each has normalized_name, raw_name, is_deceased, deceased_confidence)\n   - vesting string\n   - vesting_evidence.exact_language (or null)\n   - acquisition_type string\n   - flags array\n3. Extract court cases from the investigation session if present. Map each to: { case_number, case_url, case_type, county }.\n4. Call Write to HeirMatrix with all extracted data plus heirmatrix_property_id, scraper_property_id, and verdict.\n\nReturn: { \"status\": \"written\", \"heirmatrix_property_id\": <id> }"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        1800,
+        200
+      ],
+      "id": "writer-agent-001",
+      "name": "Writer Agent",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1800,
+        400
+      ],
+      "id": "claude-haiku-4-5-writer-agent",
+      "name": "CLAUDE HAIKU 4.5 (4)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "iEqUI506MB7qRwlH",
+          "name": "Anthropic account"
+        }
+      }
     }
   ],
   "connections": {
@@ -1104,6 +1175,11 @@
         [
           {
             "node": "Conclusion Writer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Writer Agent",
             "type": "ai_tool",
             "index": 0
           }
@@ -1467,6 +1543,39 @@
         [
           {
             "node": "Title Attorney",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to HeirMatrix": {
+      "ai_tool": [
+        [
+          {
+            "node": "Writer Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Writer Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Case Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLAUDE HAIKU 4.5 (4)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Writer Agent",
             "type": "ai_languageModel",
             "index": 0
           }
