@@ -40,11 +40,11 @@ def property_full_research(data: dict) -> tuple[int, dict]:
     try:
         cur = dict_cursor(conn)
 
-        # Core property record
+        # Core property record (case-insensitive county match)
         cur.execute(
             """
             SELECT * FROM properties
-            WHERE parcel_id = %s AND county = %s AND state_code = %s
+            WHERE parcel_id = %s AND LOWER(county) = LOWER(%s) AND state_code = %s
             """,
             (parcel_id, county, state_code),
         )

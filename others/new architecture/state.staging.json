@@ -1035,8 +1035,75 @@
           ]
         },
         "sendBody": true,
-        "contentType": "json",
-        "jsonBody": "={{ JSON.stringify({\n  heirmatrix_property_id: $fromAI('heirmatrix_property_id', 'The HeirMatrix property ID from the original webhook payload'),\n  scraper_property_id: $fromAI('scraper_property_id', 'The ScraperSystems property_id integer'),\n  owners: $fromAI('owners', 'Array of current_owners: [{normalized_name, raw_name, is_deceased, deceased_confidence}]', 'json') ?? [],\n  vesting: $fromAI('vesting', 'Vesting type: sole|tenancy_by_entirety|jtwros|tenants_in_common|trust|entity|unresolved'),\n  vesting_evidence_language: $fromAI('vesting_evidence_language', 'Exact vesting language from deed, or null') ?? null,\n  acquisition_type: $fromAI('acquisition_type', 'deed|inheritance_with_deed_of_distribution|inheritance_court_only|unresolved'),\n  deed_book: $fromAI('deed_book', 'Deed book number of primary acquisition document, or null') ?? null,\n  deed_page: $fromAI('deed_page', 'Deed page number of primary acquisition document, or null') ?? null,\n  deed_date: $fromAI('deed_date', 'Recorded date of primary acquisition document (YYYY-MM-DD), or null') ?? null,\n  date_of_death: $fromAI('date_of_death', 'Date of death of deceased owner (YYYY-MM-DD), or null') ?? null,\n  date_of_birth: $fromAI('date_of_birth', 'Date of birth of deceased owner (YYYY-MM-DD), or null') ?? null,\n  obituary_url: $fromAI('obituary_url', 'URL of obituary if found, or null') ?? null,\n  obituary_text: $fromAI('obituary_text', 'Full text of obituary if found, or null') ?? null,\n  court_cases: $fromAI('court_cases', 'Array of court/probate cases: [{case_number, case_type, county, filing_date}]', 'json') ?? [],\n  probate_case_number: $fromAI('probate_case_number', 'Primary probate/estate case number, or null') ?? null,\n  probate_county: $fromAI('probate_county', 'County where probate was filed, or null') ?? null,\n  will_found: $fromAI('will_found', 'yes|no|null \u2014 whether a will was found') ?? null,\n  flags: $fromAI('flags', 'Array of flag strings from conclusion', 'json') ?? [],\n  verdict: $fromAI('verdict', 'approved|flagged_for_human|heir_property_confirmed')\n}) }}",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "heirmatrix_property_id",
+              "value": "={{ $fromAI('heirmatrix_property_id', 'The HeirMatrix property ID integer from the original webhook payload') }}"
+            },
+            {
+              "name": "scraper_property_id",
+              "value": "={{ $fromAI('scraper_property_id', 'The ScraperSystems property_id integer') }}"
+            },
+            {
+              "name": "vesting",
+              "value": "={{ $fromAI('vesting', 'Vesting type: sole|tenancy_by_entirety|jtwros|tenants_in_common|trust|entity|unresolved') }}"
+            },
+            {
+              "name": "vesting_evidence_language",
+              "value": "={{ $fromAI('vesting_evidence_language', 'Exact vesting language from deed or null') }}"
+            },
+            {
+              "name": "acquisition_type",
+              "value": "={{ $fromAI('acquisition_type', 'deed|inheritance_with_deed_of_distribution|inheritance_court_only|unresolved') }}"
+            },
+            {
+              "name": "deed_book",
+              "value": "={{ $fromAI('deed_book', 'Deed book number of primary acquisition document or null') }}"
+            },
+            {
+              "name": "deed_page",
+              "value": "={{ $fromAI('deed_page', 'Deed page number of primary acquisition document or null') }}"
+            },
+            {
+              "name": "deed_date",
+              "value": "={{ $fromAI('deed_date', 'Recorded date of primary acquisition document YYYY-MM-DD or null') }}"
+            },
+            {
+              "name": "date_of_death",
+              "value": "={{ $fromAI('date_of_death', 'Date of death of deceased owner YYYY-MM-DD or null') }}"
+            },
+            {
+              "name": "date_of_birth",
+              "value": "={{ $fromAI('date_of_birth', 'Date of birth of deceased owner YYYY-MM-DD or null') }}"
+            },
+            {
+              "name": "obituary_url",
+              "value": "={{ $fromAI('obituary_url', 'URL of obituary if found or null') }}"
+            },
+            {
+              "name": "obituary_text",
+              "value": "={{ $fromAI('obituary_text', 'Full text of obituary if found or null') }}"
+            },
+            {
+              "name": "probate_case_number",
+              "value": "={{ $fromAI('probate_case_number', 'Primary probate estate case number or null') }}"
+            },
+            {
+              "name": "probate_county",
+              "value": "={{ $fromAI('probate_county', 'County where probate was filed or null') }}"
+            },
+            {
+              "name": "will_found",
+              "value": "={{ $fromAI('will_found', 'yes or no or null whether a will was found') }}"
+            },
+            {
+              "name": "verdict",
+              "value": "={{ $fromAI('verdict', 'approved|flagged_for_human|heir_property_confirmed') }}"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequestTool",
