@@ -694,7 +694,7 @@
         "url": "http://127.0.0.1:8000/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (function() {\n  const pc = $('Person Compiler').first().json;\n  if (!pc.cascade_needed) {\n    return { session_id: pc.session_id, property_id: pc.property_id, persons: [] };\n  }\n  return {\n    session_id: pc.session_id,\n    property_id: pc.property_id,\n    persons: (pc.cascade_relatives || [])\n      .filter(r => r.name && r.name.length >= 3)\n      .map(r => ({\n        name: (r.name || '').replace(/\\s*\\(.*?\\)/g, '').trim(),\n        relationship_hint: r.relationship || 'cascade_heir'\n      }))\n      .filter(p => p.name.length >= 3)\n  };\n})() }}",
+        "jsonBody": "={{ (function() {\n  const pc = $('Person Compiler').first().json;\n  if (!pc.cascade_needed) {\n    return { session_id: pc.session_id, property_id: pc.property_id, persons: [] };\n  }\n  const INVALID = ['HEIRS OF','HEIR OF','ESTATE OF','UNKNOWN','CHILDREN OF','DESCENDANTS OF'];\n  function isValidName(name) {\n    if (!name || name.length < 3) return false;\n    const u = name.toUpperCase();\n    if (INVALID.some(p => u.startsWith(p))) return false;\n    if (name.split(' ').filter(Boolean).length < 2) return false;\n    return true;\n  }\n  return {\n    session_id: pc.session_id,\n    property_id: pc.property_id,\n    persons: (pc.cascade_relatives || [])\n      .map(r => ({\n        name: (r.name || '').replace(/\\s*\\(.*?\\)/g, '').trim(),\n        relationship_hint: (r.relationship || 'cascade_heir').substring(0, 120)\n      }))\n      .filter(r => isValidName(r.name))\n  };\n})() }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -990,7 +990,7 @@
         "promptType": "define",
         "text": "=Apply NC Chapter 29 intestate succession to the family tree below.\n\nFamily tree assembled from research:\n{{ JSON.stringify($json, null, 2) }}\n\nSession ID: {{ $json.session_id }}\nProperty ID: {{ $json.property_id }}\nRoot Decedent: {{ $json.root_decedent && $json.root_decedent.name }}\n\nUse Filter Cascade Persons before building your cascade list to avoid re-researching persons already in the session.",
         "options": {
-          "systemMessage": "You are the NC Intestate Succession Expert and the sole decision-maker for when heir tracing stops.\n\nBEFORE ANYTHING ELSE — check the input for data quality:\nIf family_members is empty OR session_id is null OR the input contains _parse_error:\n  → Do NOT ask for clarification. Output this immediately and stop:\n  {\n    \"determination_status\": \"parse_error\",\n    \"cascade_needed\": false,\n    \"cascade_persons\": [],\n    \"heir_shares\": [],\n    \"session_id\": (use whatever session_id is in input, even if null),\n    \"property_id\": (use whatever property_id is in input, even if null),\n    \"root_decedent_name\": \"\",\n    \"totals_check\": 0,\n    \"requires_human_review\": true,\n    \"human_review_reason\": \"Family Assembler produced no parseable family tree\",\n    \"notes\": \"[paste _parse_error content here if present]\"\n  }\n\n═══════════════════════════════════════════════════════\nYOUR GOAL — LOCATE LIVING HEIRS, NOT PERFECT ACCOUNTING\n═══════════════════════════════════════════════════════\n\nYour job is NOT to produce a court-ready Chapter 29 calculation.\nYour job is to answer: \"Which living people have a credible ownership share, and which unresearched branches do we need to dig into to find them?\"\n\nMissing dates of death, missing marital status, and medium-confidence relationships are NORMAL at this stage of research. Do NOT block cascade or escalate to human review because of missing data alone. Keep moving.\n\n═══════════════════════════════════════════════════════\nPART A — FILTER OBVIOUS NON-HEIRS (run first)\n═══════════════════════════════════════════════════════\n\nRemove from consideration any family_member where:\n- Obituary explicitly names parents that are NOT in the root decedent's family line\n- The connection is based on geographic proximity only (same county) with no name or relative overlap\n\nDo NOT remove anyone because:\n- Their date of death is unknown\n- Their relationship confidence is \"medium\" (medium is good enough)\n- They share a common surname (Hayes, Smith, etc.) — that alone is not disqualifying\n\n═══════════════════════════════════════════════════════\nPART B — WHICH BRANCH TO FOLLOW (NC Chapter 29 as a guide)\n═══════════════════════════════════════════════════════\n\nUse intestate succession order to determine which branch is the ACTIVE heir line:\n1. Children and descendants of deceased children (per stirpes) — check here first\n2. If no children → spouse, then parents, then siblings and their descendants\n3. If none of the above → escalate to human review (rare)\n\nThis tells you the direction: are we digging DOWN (into children/grandchildren) or UP/SIDEWAYS (into siblings/parents)?\n\nFor each person in the ACTIVE heir line:\n- If LIVING → they are a confirmed heir with a share\n- If DECEASED with cascade_relatives → call Filter Cascade Persons; unresearched relatives need to be queued\n- If DECEASED with empty cascade_relatives → branch is exhausted, mark resolved\n\n═══════════════════════════════════════════════════════\nPART A — STOP OR CASCADE DECISION\n═══════════════════════════════════════════════════════\n\nCRITICAL: cascade_persons must ONLY come from cascade_relatives in each family_member's DB record.\ncascade_relatives = SkipGenie possible_relatives captured at research time.\nNEVER derive cascade persons from family_alive_at_death, obituary survivors, or any other source.\n\nFor EVERY deceased person in the active heir line where cascade_needed = true:\n  1. Look at their cascade_relatives list (SkipGenie-sourced only)\n  2. If cascade_relatives is empty → this branch has no SkipGenie leads, do NOT cascade, mark as resolved\n  3. If cascade_relatives is non-empty → call Filter Cascade Persons with: session_id + names from cascade_relatives\n  4. If new_persons is non-empty → this branch is unresolved\n\nAfter checking ALL active-heir-line deceased persons:\n- If ANY branch has new_persons → cascade_needed=true, collect all new_persons as cascade_persons\n- If ALL branches resolved → cascade_needed=false, proceed to Part B output\n\nIf cascade_needed=true — output ONLY this and stop:\n{\n  \"determination_status\": \"cascade_required\",\n  \"cascade_needed\": true,\n  \"cascade_persons\": [{ \"name\": \"\", \"reason\": \"heir of [deceased person name] per SkipGenie\" }],\n  \"heir_shares\": [],\n  \"session_id\": 0,\n  \"property_id\": 0,\n  \"root_decedent_name\": \"\",\n  \"requires_human_review\": false,\n  \"human_review_reason\": null,\n  \"notes\": \"\"\n}\n\n═══════════════════════════════════════════════════════\nPART B OUTPUT — LIVING HEIR SHARES (only when cascade_needed=false)\n═══════════════════════════════════════════════════════\n\nApply NC Chapter 29 to assign shares to the living heirs found. Use best available evidence — do not block on missing dates. If a date is unknown, note it but still calculate the most probable share.\n\nSTEP 1 — Intestacy check (§29-8)\nConfirmed will → determination_status=\"will_exists\", requires_human_review=true, stop.\n\nSTEP 2 — 120-hour survival rule (§29-13)\nOnly apply if you have actual dates of death. If unknown, skip this step and note it.\n\nSTEP 3 — Surviving spouse share (§29-14)\nApply if spouse is confirmed. If marital status unknown, note it and proceed without spouse share.\n\nSTEP 4 — Remainder per priority order (§29-15)\n1. Children + descendants of deceased children (per stirpes §29-16)\n2. No descendants → parents equally\n3. No descendants/parents → siblings and their descendants\n4. None above → grandparents/aunts/uncles\n5. None within 5 degrees → escheat\n\nSTEP 5 — Per-stirpes (§29-16)\nDivide equally among surviving members + deceased members with living descendants.\n\nHUMAN REVIEW — set requires_human_review=true ONLY for:\n- Confirmed will exists\n- Heir shares cannot be calculated because the family structure itself is contradictory (not just missing data)\n- Escheat determination\n- Heir shares do not sum to 1.0 after best-effort calculation\n\nDo NOT set requires_human_review=true just because dates of death or marital status are unknown.\n\nFinal output:\n{\n  \"determination_status\": \"complete|partial|escalate_human\",\n  \"cascade_needed\": false,\n  \"cascade_persons\": [],\n  \"heir_shares\": [\n    {\n      \"name\": \"\",\n      \"vital_status\": \"living|deceased\",\n      \"relationship\": \"\",\n      \"share_fraction\": \"1/3\",\n      \"share_decimal\": 0.333,\n      \"statutory_basis\": \"§29-15(2) + §29-16\",\n      \"branch_status\": \"resolved|blocked\"\n    }\n  ],\n  \"session_id\": 0,\n  \"property_id\": 0,\n  \"root_decedent_name\": \"\",\n  \"totals_check\": 1.0,\n  \"requires_human_review\": false,\n  \"human_review_reason\": null,\n  \"notes\": \"\"\n}",
+          "systemMessage": "MANDATORY OUTPUT RULE — READ THIS FIRST:\nYour ENTIRE response must be a single raw JSON object.\nStart your response with \"{\". End your response with \"}\".\nNO markdown. NO analysis text. NO headers. NO code fences. NO explanation before or after the JSON.\nDo your reasoning internally. Only the final JSON object goes in your response.\nIf you write even one word outside the JSON braces, the downstream system breaks.\n\nYou are the NC Intestate Succession Expert and the sole decision-maker for when heir tracing stops.\n\nBEFORE ANYTHING ELSE — check the input for data quality:\nIf family_members is empty OR session_id is null OR the input contains _parse_error:\n  → Do NOT ask for clarification. Output this immediately and stop:\n  {\n    \"determination_status\": \"parse_error\",\n    \"cascade_needed\": false,\n    \"cascade_persons\": [],\n    \"heir_shares\": [],\n    \"session_id\": (use whatever session_id is in input, even if null),\n    \"property_id\": (use whatever property_id is in input, even if null),\n    \"root_decedent_name\": \"\",\n    \"totals_check\": 0,\n    \"requires_human_review\": true,\n    \"human_review_reason\": \"Family Assembler produced no parseable family tree\",\n    \"notes\": \"[paste _parse_error content here if present]\"\n  }\n\n═══════════════════════════════════════════════════════\nYOUR GOAL — LOCATE LIVING HEIRS, NOT PERFECT ACCOUNTING\n═══════════════════════════════════════════════════════\n\nYour job is NOT to produce a court-ready Chapter 29 calculation.\nYour job is to answer: \"Which living people have a credible ownership share, and which unresearched branches do we need to dig into to find them?\"\n\nMissing dates of death, missing marital status, and medium-confidence relationships are NORMAL at this stage of research. Do NOT block cascade or escalate to human review because of missing data alone. Keep moving.\n\n═══════════════════════════════════════════════════════\nPART A — FILTER OBVIOUS NON-HEIRS (run first)\n═══════════════════════════════════════════════════════\n\nRemove from consideration any family_member where:\n- Obituary explicitly names parents that are NOT in the root decedent's family line\n- The connection is based on geographic proximity only (same county) with no name or relative overlap\n\nDo NOT remove anyone because:\n- Their date of death is unknown\n- Their relationship confidence is \"medium\" (medium is good enough)\n- They share a common surname (Hayes, Smith, etc.) — that alone is not disqualifying\n\n═══════════════════════════════════════════════════════\nPART B — WHICH BRANCH TO FOLLOW (NC Chapter 29 as a guide)\n═══════════════════════════════════════════════════════\n\nUse intestate succession order to determine which branch is the ACTIVE heir line:\n1. Children and descendants of deceased children (per stirpes) — check here first\n2. If no children → spouse, then parents, then siblings and their descendants\n3. If none of the above → escalate to human review (rare)\n\nThis tells you the direction: are we digging DOWN (into children/grandchildren) or UP/SIDEWAYS (into siblings/parents)?\n\nFor each person in the ACTIVE heir line:\n- If LIVING → they are a confirmed heir with a share\n- If DECEASED with cascade_relatives → call Filter Cascade Persons; unresearched relatives need to be queued\n- If DECEASED with empty cascade_relatives → branch is exhausted, mark resolved\n\n═══════════════════════════════════════════════════════\nPART A — STOP OR CASCADE DECISION\n═══════════════════════════════════════════════════════\n\nCRITICAL: cascade_persons must ONLY come from cascade_relatives in each family_member's DB record.\ncascade_relatives = SkipGenie possible_relatives captured at research time.\nNEVER derive cascade persons from family_alive_at_death, obituary survivors, or any other source.\n\nFor EVERY deceased person in the active heir line where cascade_needed = true:\n  1. Look at their cascade_relatives list (SkipGenie-sourced only)\n  2. If cascade_relatives is empty → this branch has no SkipGenie leads, do NOT cascade, mark as resolved\n  3. If cascade_relatives is non-empty → call Filter Cascade Persons with: session_id + names from cascade_relatives\n  4. If new_persons is non-empty → this branch is unresolved\n\nAfter checking ALL active-heir-line deceased persons:\n- If ANY branch has new_persons → cascade_needed=true, collect all new_persons as cascade_persons\n- If ALL branches resolved → cascade_needed=false, proceed to Part B output\n\nIf cascade_needed=true — output ONLY this and stop:\n{\n  \"determination_status\": \"cascade_required\",\n  \"cascade_needed\": true,\n  \"cascade_persons\": [{ \"name\": \"\", \"reason\": \"heir of [deceased person name] per SkipGenie\" }],\n  \"heir_shares\": [],\n  \"session_id\": 0,\n  \"property_id\": 0,\n  \"root_decedent_name\": \"\",\n  \"requires_human_review\": false,\n  \"human_review_reason\": null,\n  \"notes\": \"\"\n}\n\n═══════════════════════════════════════════════════════\nPART B OUTPUT — LIVING HEIR SHARES (only when cascade_needed=false)\n═══════════════════════════════════════════════════════\n\nApply NC Chapter 29 to assign shares to the living heirs found. Use best available evidence — do not block on missing dates. If a date is unknown, note it but still calculate the most probable share.\n\nSTEP 1 — Intestacy check (§29-8)\nConfirmed will → determination_status=\"will_exists\", requires_human_review=true, stop.\n\nSTEP 2 — 120-hour survival rule (§29-13)\nOnly apply if you have actual dates of death. If unknown, skip this step and note it.\n\nSTEP 3 — Surviving spouse share (§29-14)\nApply if spouse is confirmed. If marital status unknown, note it and proceed without spouse share.\n\nSTEP 4 — Remainder per priority order (§29-15)\n1. Children + descendants of deceased children (per stirpes §29-16)\n2. No descendants → parents equally\n3. No descendants/parents → siblings and their descendants\n4. None above → grandparents/aunts/uncles\n5. None within 5 degrees → escheat\n\nSTEP 5 — Per-stirpes (§29-16)\nDivide equally among surviving members + deceased members with living descendants.\n\nHUMAN REVIEW — set requires_human_review=true ONLY for:\n- Confirmed will exists\n- Heir shares cannot be calculated because the family structure itself is contradictory (not just missing data)\n- Escheat determination\n- Heir shares do not sum to 1.0 after best-effort calculation\n\nDo NOT set requires_human_review=true just because dates of death or marital status are unknown.\n\nFinal output:\n{\n  \"determination_status\": \"complete|partial|escalate_human\",\n  \"cascade_needed\": false,\n  \"cascade_persons\": [],\n  \"heir_shares\": [\n    {\n      \"name\": \"\",\n      \"vital_status\": \"living|deceased\",\n      \"relationship\": \"\",\n      \"share_fraction\": \"1/3\",\n      \"share_decimal\": 0.333,\n      \"statutory_basis\": \"§29-15(2) + §29-16\",\n      \"branch_status\": \"resolved|blocked\"\n    }\n  ],\n  \"session_id\": 0,\n  \"property_id\": 0,\n  \"root_decedent_name\": \"\",\n  \"totals_check\": 1.0,\n  \"requires_human_review\": false,\n  \"human_review_reason\": null,\n  \"notes\": \"\"\n}",
           "maxIterations": 30
         }
       },
@@ -1079,6 +1079,15 @@
                 "type": "boolean",
                 "operation": "equals"
               }
+            },
+            {
+              "id": "cond-no-parse-error",
+              "leftValue": "={{ $json._parse_error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
             }
           ],
           "combinator": "and"
@@ -1100,7 +1109,7 @@
         "url": "http://127.0.0.1:8000/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (function() {\n  const ip = $input.first().json;\n  return {\n    session_id: ip.session_id,\n    property_id: ip.property_id,\n    persons: (ip.cascade_persons || [])\n      .filter(p => p.name && p.name.length >= 3)\n      .map(p => ({\n        name: (p.name || '').replace(/\\s*\\(.*?\\)/g, '').trim(),\n        relationship_hint: p.reason || 'cascade_heir'\n      }))\n      .filter(p => p.name.length >= 3)\n  };\n})() }}",
+        "jsonBody": "={{ (function() {\n  const ip = $input.first().json;\n  const INVALID = ['HEIRS OF','HEIR OF','ESTATE OF','UNKNOWN','CHILDREN OF','DESCENDANTS OF'];\n  function isValidName(name) {\n    if (!name || name.length < 3) return false;\n    const u = name.toUpperCase();\n    if (INVALID.some(p => u.startsWith(p))) return false;\n    if (name.split(' ').filter(Boolean).length < 2) return false;\n    return true;\n  }\n  return {\n    session_id: ip.session_id,\n    property_id: ip.property_id,\n    persons: (ip.cascade_persons || [])\n      .map(p => ({\n        name: (p.name || '').replace(/\\s*\\(.*?\\)/g, '').trim(),\n        relationship_hint: (p.reason || 'cascade_heir').substring(0, 120)\n      }))\n      .filter(p => isValidName(p.name))\n  };\n})() }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -1242,6 +1251,86 @@
           "name": "Anthropic account"
         }
       }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search Ancestry.com for genealogy records about a person. Use this to find death certificates, census records, Social Security Death Index entries, and family data. Best used after SkipGenie gives you a birth year. Pass first_name and last_name (required), plus birth_year from SkipGenie if available, and state (default NC). Returns records with dob, dod, spouse_name, parents[], children[], residence, and source_url. IMPORTANT: After reviewing results, call Write Ancestry Findings to save relevant records.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name of the person to search\"), \"last_name\": $fromAI(\"last_name\", \"Last name of the person to search\"), \"birth_year\": $fromAI(\"birth_year\", \"Approximate birth year from SkipGenie, or empty string if unknown\"), \"death_year\": $fromAI(\"death_year\", \"Approximate death year if known, or empty string\"), \"state\": $fromAI(\"state\", \"State abbreviation or name, default NC\") } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        -16832,
+        13904
+      ],
+      "id": "6ee237f2-fc57-42d6-b442-4c7cae91b8ea",
+      "name": "Ancestry Search",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Save relevant Ancestry.com records found for this person to the database. Call this after Ancestry Search once you have identified records that match (or likely match) the person. Pass session_id, property_id, search_name (the name you searched for), and a records[] array of the relevant hits. For each record include: record_id, record_type, person_name, dob, dod, spouse_name, parents, children, source_url, relevance (confirmed|likely|possible), and relevance_notes explaining why you chose it. Skip records that clearly do not match (wrong state, wrong era, wrong person).",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write-ancestry",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The session ID for this heir research run\"), \"property_id\": $fromAI(\"property_id\", \"The property ID\"), \"search_name\": $fromAI(\"search_name\", \"The full name that was searched\"), \"search_first\": $fromAI(\"search_first\", \"First name searched\"), \"search_last\": $fromAI(\"search_last\", \"Last name searched\"), \"search_birth_year\": $fromAI(\"search_birth_year\", \"Birth year used in search, or empty\"), \"search_state\": $fromAI(\"search_state\", \"State searched, default NC\"), \"records\": $fromAI(\"records\", \"Array of relevant Ancestry record objects to save\") } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        -16688,
+        13904
+      ],
+      "id": "4747cfa8-f2c2-4622-8256-db8690732cda",
+      "name": "Write Ancestry Findings",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search Ancestry.com for genealogy records to fill relationship gaps for a specific person. Use this when obituary text is missing, vague, or does not name all relatives. Pass first_name, last_name, and birth_year (if known from prior research). Returns structured spouse_name, parents[], children[] from Ancestry records — much cleaner input than parsing free-text obituaries. Use the results to confirm or extend the family tree you are assembling.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name of the person\"), \"last_name\": $fromAI(\"last_name\", \"Last name of the person\"), \"birth_year\": $fromAI(\"birth_year\", \"Birth year if known from prior research, or empty string\"), \"death_year\": $fromAI(\"death_year\", \"Death year if known, or empty string\"), \"state\": $fromAI(\"state\", \"State, default NC\") } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        -18128,
+        13120
+      ],
+      "id": "1de7cc32-7eb4-428f-ad97-9ea44082571b",
+      "name": "Ancestry Search (FA)",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Load all Ancestry.com records saved by the Obituary Researcher for this session. These are pre-filtered, relevant records already judged by the Obituary Researcher. Use this alongside Load Obituary Texts to get structured family data (spouse_name, parents[], children[]) that supplements or fills gaps in obituary text. Pass session_id to get all records, or add relevance=confirmed to get only high-confidence matches.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/ancestry-records",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The session ID to load ancestry records for\"), \"relevance\": $fromAI(\"relevance\", \"Optional filter: confirmed, likely, possible, or omit for all\") } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        -17984,
+        13120
+      ],
+      "id": "62eca83e-4f9c-4dc1-aab9-f12b15cb0a5e",
+      "name": "Load Ancestry Records",
+      "rewireOutputLogTo": "ai_tool"
     }
   ],
   "connections": {
@@ -1881,6 +1970,50 @@
           {
             "node": "Orch - SkipGenie",
             "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Obituary Researcher",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Ancestry Findings": {
+      "ai_tool": [
+        [
+          {
+            "node": "Obituary Researcher",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Search (FA)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Family Assembler",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Ancestry Records": {
+      "ai_tool": [
+        [
+          {
+            "node": "Family Assembler",
+            "type": "ai_tool",
             "index": 0
           }
         ]

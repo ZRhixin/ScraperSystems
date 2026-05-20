@@ -630,6 +630,205 @@ def claim_fa_trigger(data: dict) -> tuple[int, dict]:
     return 200, {"session_id": session_id, "claimed": row is not None}
 
 
+# ---------------------------------------------------------------------------
+# POST /heir/write-ancestry
+# ---------------------------------------------------------------------------
+def write_ancestry(data: dict) -> tuple[int, dict]:
+    """
+    Save Ancestry.com record findings for a person to heir_ancestry_records.
+    Accepts a single record (flat fields) or a batch via records[] array.
+
+    Required: session_id, property_id, search_name
+    Optional: person_id, records[] (array of record objects), plus individual
+              record fields if sending a single record directly.
+    Returns:  { saved, session_id }
+    """
+    session_id  = data.get("session_id")
+    property_id = data.get("property_id")
+    search_name = (data.get("search_name") or "").strip()
+
+    if not session_id:
+        return 400, {"error": "session_id is required"}
+    if not property_id:
+        return 400, {"error": "property_id is required"}
+    if not search_name:
+        return 400, {"error": "search_name is required"}
+
+    person_id        = data.get("person_id") or None
+    search_first     = (data.get("search_first") or "").strip() or None
+    search_last      = (data.get("search_last") or "").strip() or None
+    search_birth_year = (data.get("search_birth_year") or "").strip() or None
+    search_death_year = (data.get("search_death_year") or "").strip() or None
+    search_state     = (data.get("search_state") or "NC").strip()
+
+    # Support batch (records[]) or single record (flat fields)
+    records = data.get("records")
+    if not records:
+        # Single record mode — wrap the top-level fields into a list
+        records = [data]
+
+    saved = []
+    with get_conn() as conn:
+        with dict_cursor(conn) as cur:
+            for rec in records:
+                if not isinstance(rec, dict):
+                    continue
+                parents  = rec.get("parents") or []
+                children = rec.get("children") or []
+                siblings = rec.get("siblings") or []
+
+                cur.execute("""
+                    INSERT INTO heir_ancestry_records (
+                        session_id, property_id, person_id,
+                        search_name, search_first, search_last,
+                        search_birth_year, search_death_year, search_state,
+                        record_id, collection_id, record_type, collection,
+                        person_name, dob, dod,
+                        birth_location, death_location,
+                        spouse_name, parents, children, siblings,
+                        residence, source_url, confidence, has_image, viewable,
+                        relevance, relevance_notes, raw_data
+                    ) VALUES (
+                        %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s
+                    )
+                    RETURNING id
+                """, (
+                    session_id, property_id, person_id,
+                    search_name, search_first, search_last,
+                    search_birth_year, search_death_year, search_state,
+                    rec.get("record_id") or None,
+                    rec.get("collection_id") or None,
+                    rec.get("record_type") or None,
+                    rec.get("collection") or None,
+                    rec.get("person_name") or None,
+                    rec.get("dob") or None,
+                    rec.get("dod") or None,
+                    rec.get("birth_location") or None,
+                    rec.get("death_location") or None,
+                    rec.get("spouse_name") or None,
+                    _dump(parents),
+                    _dump(children),
+                    _dump(siblings),
+                    rec.get("residence") or None,
+                    rec.get("source_url") or None,
+                    rec.get("confidence") or None,
+                    bool(rec.get("has_image", False)),
+                    bool(rec.get("viewable", False)),
+                    rec.get("relevance") or None,
+                    rec.get("relevance_notes") or None,
+                    _dump(rec),
+                ))
+                row = cur.fetchone()
+                saved.append(row["id"])
+
+            conn.commit()
+
+    return 200, {
+        "saved": len(saved),
+        "record_ids": saved,
+        "session_id": session_id,
+        "search_name": search_name,
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /heir/ancestry-records
+# ---------------------------------------------------------------------------
+def load_ancestry_records(data: dict) -> tuple[int, dict]:
+    """
+    Load all saved Ancestry findings for a session, optionally filtered by
+    person_id or relevance.
+
+    Required: session_id
+    Optional: person_id, relevance (confirmed|likely|possible|rejected)
+    Returns:  { session_id, count, records: [...] }
+    """
+    session_id = data.get("session_id")
+    person_id  = data.get("person_id")
+    relevance  = data.get("relevance")
+
+    if not session_id:
+        return 400, {"error": "session_id is required"}
+
+    filters = ["session_id = %s"]
+    params: list = [session_id]
+
+    if person_id:
+        filters.append("person_id = %s")
+        params.append(person_id)
+    if relevance:
+        filters.append("relevance = %s")
+        params.append(relevance)
+
+    where = " AND ".join(filters)
+
+    with get_conn() as conn:
+        with dict_cursor(conn) as cur:
+            cur.execute(f"""
+                SELECT
+                    id, session_id, property_id, person_id,
+                    search_name, search_first, search_last,
+                    record_id, record_type, collection,
+                    person_name, dob, dod,
+                    birth_location, death_location,
+                    spouse_name, parents, children, siblings,
+                    residence, source_url, confidence,
+                    has_image, viewable,
+                    relevance, relevance_notes,
+                    created_at
+                FROM heir_ancestry_records
+                WHERE {where}
+                ORDER BY
+                    CASE relevance
+                        WHEN 'confirmed' THEN 1
+                        WHEN 'likely'    THEN 2
+                        WHEN 'possible'  THEN 3
+                        ELSE 4
+                    END,
+                    created_at ASC
+            """, params)
+            rows = cur.fetchall()
+
+    records = []
+    for r in rows:
+        records.append({
+            "id":               r["id"],
+            "person_id":        r["person_id"],
+            "search_name":      r["search_name"],
+            "record_id":        r["record_id"],
+            "record_type":      r["record_type"],
+            "collection":       r["collection"],
+            "person_name":      r["person_name"],
+            "dob":              r["dob"],
+            "dod":              r["dod"],
+            "birth_location":   r["birth_location"],
+            "death_location":   r["death_location"],
+            "spouse_name":      r["spouse_name"],
+            "parents":          r["parents"] or [],
+            "children":         r["children"] or [],
+            "siblings":         r["siblings"] or [],
+            "residence":        r["residence"],
+            "source_url":       r["source_url"],
+            "confidence":       r["confidence"],
+            "relevance":        r["relevance"],
+            "relevance_notes":  r["relevance_notes"],
+        })
+
+    return 200, {
+        "session_id": session_id,
+        "count": len(records),
+        "records": records,
+    }
+
+
 def write_heir_tree(data: dict) -> tuple[int, dict]:
     """
     Write the final compiled heir tree after all research and Intestate Expert analysis.

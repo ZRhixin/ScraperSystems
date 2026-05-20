@@ -79,6 +79,7 @@ from investigate.handlers import (
     court_pull as inv_court_pull,
     pull_deed as inv_pull_deed,
 )
+from ancestryapi.client import search as ancestry_search, record_detail as ancestry_record
 from heir.handlers import (
     create_session as heir_create_session,
     write_person as heir_write_person,
@@ -91,6 +92,8 @@ from heir.handlers import (
     complete_person as heir_complete_person,
     queue_status as heir_queue_status,
     claim_fa_trigger as heir_claim_fa_trigger,
+    write_ancestry as heir_write_ancestry,
+    load_ancestry_records as heir_load_ancestry_records,
 )
 
 _lock = threading.Lock()
@@ -523,6 +526,28 @@ def _scout_write(data: dict) -> tuple[int, dict]:
 
 
 # ---------------------------------------------------------------------------
+# Ancestry.com
+# ---------------------------------------------------------------------------
+
+def _ancestry_search(data: dict) -> tuple[int, dict]:
+    result = ancestry_search(
+        first_name=(data.get("first_name") or "").strip(),
+        last_name=(data.get("last_name") or "").strip(),
+        birth_year=str(data.get("birth_year") or "").strip(),
+        death_year=str(data.get("death_year") or "").strip(),
+        state=(data.get("state") or "NC").strip(),
+    )
+    return 200, result
+
+
+def _ancestry_record(data: dict) -> tuple[int, dict]:
+    record_id = (data.get("record_id") or "").strip()
+    if not record_id:
+        return 400, {"error": "record_id is required"}
+    return 200, ancestry_record(record_id)
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
@@ -574,6 +599,11 @@ _ROUTES: dict[str, callable] = {
     "/heir/complete-person":                     lambda d: heir_complete_person(d),
     "/heir/queue-status":                        lambda d: heir_queue_status(d),
     "/heir/claim-fa-trigger":                    lambda d: heir_claim_fa_trigger(d),
+    "/heir/write-ancestry":                      lambda d: heir_write_ancestry(d),
+    "/heir/ancestry-records":                    lambda d: heir_load_ancestry_records(d),
+    # Ancestry.com genealogy search
+    "/ancestry/search":                          lambda d: _ancestry_search(d),
+    "/ancestry/record":                          lambda d: _ancestry_record(d),
 }
 
 
