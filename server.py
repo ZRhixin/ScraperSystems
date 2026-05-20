@@ -535,7 +535,17 @@ def _ancestry_search(data: dict) -> tuple[int, dict]:
         last_name=(data.get("last_name") or "").strip(),
         birth_year=str(data.get("birth_year") or "").strip(),
         death_year=str(data.get("death_year") or "").strip(),
+        birth_year_range=int(data.get("birth_year_range") or 3),
+        death_year_range=int(data.get("death_year_range") or 3),
         state=(data.get("state") or "NC").strip(),
+        birth_location=(data.get("birth_location") or "").strip(),
+        death_location=(data.get("death_location") or "").strip(),
+        gender=(data.get("gender") or "").strip(),
+        spouse=(data.get("spouse") or "").strip(),
+        father=(data.get("father") or "").strip(),
+        mother=(data.get("mother") or "").strip(),
+        name_x=(data.get("name_x") or "1_1").strip(),
+        count=int(data.get("count") or 50),
     )
     return 200, result
 

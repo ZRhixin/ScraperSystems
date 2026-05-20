@@ -53,9 +53,35 @@ def search_person(
     last_name: str = "",
     birth_year: str = "",
     death_year: str = "",
+    birth_year_range: int = 3,
+    death_year_range: int = 3,
     state: str = "",
-    count: int = 20,
+    birth_location: str = "",
+    death_location: str = "",
+    gender: str = "",
+    spouse: str = "",
+    father: str = "",
+    mother: str = "",
+    name_x: str = "1_1",
+    count: int = 50,
 ) -> dict:
+    """
+    Search Ancestry.com for a person.
+
+    name_x controls name matching:
+      "1_1" = exact first + exact last (default)
+      "0_1" = any first + exact last  (useful when first name is uncertain)
+      "1_0" = exact first + any last
+
+    birth_year_range / death_year_range: ±N years. Default 3 — tight when
+      birth_year comes from SkipGenie (a known confident source).
+
+    birth_location / death_location: e.g. "North Carolina" — pins to state,
+      much stronger than residence filter. Use when person is known NC resident.
+
+    gender: "m" or "f" — derive from relationship_hint (son/husband=m, daughter/wife=f)
+    spouse / father / mother: known relative names for cross-referencing
+    """
     if not sess.has_valid_session():
         return {
             "error": "no_session",
@@ -69,17 +95,29 @@ def search_person(
     params: dict = {
         "name": name_param,
         "count": str(count),
-        "name_x": "1_1",       # exact first + exact last
+        "name_x": name_x,
         "searchMode": "advanced",
     }
     if birth_year:
         params["birth_year"] = str(birth_year)
-        params["birth_year_range"] = "10"
+        params["birth_year_range"] = str(birth_year_range)
     if death_year:
         params["death_year"] = str(death_year)
-        params["death_year_range"] = "10"
+        params["death_year_range"] = str(death_year_range)
     if state:
-        params["residence"] = state  # state name or abbreviation
+        params["residence"] = state
+    if birth_location:
+        params["birth"] = birth_location
+    if death_location:
+        params["death"] = death_location
+    if gender in ("m", "f"):
+        params["gender"] = gender
+    if spouse:
+        params["spouse"] = spouse.strip()
+    if father:
+        params["father"] = father.strip()
+    if mother:
+        params["mother"] = mother.strip()
 
     http = _make_session()
     try:
@@ -95,7 +133,7 @@ def search_person(
         if resp.status_code == 403:
             return {"error": "cloudflare_block", "message": "Cloudflare blocked — cf_clearance cookie may be stale"}
         resp.raise_for_status()
-    except cffi_requests.RequestException as exc:
+    except Exception as exc:
         return {"error": str(exc)}
 
     return _parse_html(resp.text, name_param)
@@ -243,7 +281,7 @@ def get_record(record_id: str) -> dict:
         if resp.status_code in (401, 403):
             return {"error": "unauthorized"}
         resp.raise_for_status()
-    except cffi_requests.RequestException as exc:
+    except Exception as exc:
         return {"error": str(exc)}
 
     return _parse_html(resp.text, record_id)

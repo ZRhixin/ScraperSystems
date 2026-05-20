@@ -35,7 +35,17 @@ def search(
     last_name: str = "",
     birth_year: str = "",
     death_year: str = "",
+    birth_year_range: int = 3,
+    death_year_range: int = 3,
     state: str = "NC",
+    birth_location: str = "",
+    death_location: str = "",
+    gender: str = "",
+    spouse: str = "",
+    father: str = "",
+    mother: str = "",
+    name_x: str = "1_1",
+    count: int = 50,
 ) -> dict:
     """
     Search Ancestry for a person.
@@ -54,7 +64,17 @@ def search(
         last_name=last_name.strip(),
         birth_year=str(birth_year).strip() if birth_year else "",
         death_year=str(death_year).strip() if death_year else "",
+        birth_year_range=birth_year_range,
+        death_year_range=death_year_range,
         state=state.strip(),
+        birth_location=birth_location.strip(),
+        death_location=death_location.strip(),
+        gender=gender.strip(),
+        spouse=spouse.strip(),
+        father=father.strip(),
+        mother=mother.strip(),
+        name_x=name_x.strip(),
+        count=count,
     )
 
 
