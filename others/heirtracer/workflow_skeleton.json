@@ -288,14 +288,13 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Search SkipGenie for:\nName: {{ $('Orch - Prep').first().json.name }}\nFirst name: {{ $('Orch - Prep').first().json._first_full }}\nLast name: {{ $('Orch - Prep').first().json._last }}\nState: NC\nCity: {{ $('Orch - Prep').first().json._city || '' }}",
+        "text": "=Generate exactly 5 SkipGenie search parameter sets for this person.\nRank them 1 (most specific, highest chance of finding the right person) to 5 (broadest fallback).\n\nPerson name: {{ $('Orch - Prep').first().json.name }}\nRelationship to decedent: {{ $('Orch - Prep').first().json.relationship_hint || 'unknown' }}\nProperty county: {{ ($('Orch - Load DB Context').first().json.property || $('Orch - Load DB Context').first().json).county || 'unknown' }}\n\nStrategy:\n1. Full first + full last + state=NC + county seat city if you know it\n2. Full first + full last + state=NC + no city\n3. First initial only + full last + state=NC\n4. No first name + full last only + state=NC (catches name/maiden changes)\n5. Full first + full last + no state (catches people who moved out of NC)\n\nOutput ONLY valid JSON, no markdown, no explanation:\n{\"attempts\":[{\"first_name\":\"...\",\"last_name\":\"...\",\"state\":\"NC\",\"city\":\"...\"},{\"first_name\":\"...\",\"last_name\":\"...\",\"state\":\"NC\",\"city\":\"\"},{\"first_name\":\"...\",\"last_name\":\"...\",\"state\":\"NC\",\"city\":\"\"},{\"first_name\":\"\",\"last_name\":\"...\",\"state\":\"NC\",\"city\":\"\"},{\"first_name\":\"...\",\"last_name\":\"...\",\"state\":\"\",\"city\":\"\"}]}",
         "options": {
-          "systemMessage": "You are a SkipGenie search specialist. Your job is to find the person in SkipGenie using the search tool.\n\nSEARCH STRATEGY — try in order, stop as soon as results is non-empty:\n1. If city is provided: search with first_name, last_name, state=\"NC\", city\n2. If no results or city was empty: search with first_name, last_name, state=\"NC\" (no city)\n3. If still no results: search with first name only (single word), last_name, state=\"NC\"\n4. After 3 attempts with no results: stop\n\nOUTPUT: Return ONLY the raw JSON object from the SkipGenie tool response — exactly as returned. No explanation, no markdown, no extra text. Your output must start with '{' and be valid JSON.",
-          "maxIterations": 5
+          "systemMessage": "You are a SkipGenie search strategist for NC heir tracing. Output ONLY a valid JSON object with an 'attempts' array of exactly 5 objects. No explanation. No markdown. No extra text. Start your response with '{'."
         }
       },
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
       "position": [
         -18832,
         13696
@@ -1331,6 +1330,241 @@
       "id": "62eca83e-4f9c-4dc1-aab9-f12b15cb0a5e",
       "name": "Load Ancestry Records",
       "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($input.first().json.text || $input.first().json.output || '').trim();\nconst prep = $('Orch - Prep').first().json;\n\nlet attempts = [];\ntry {\n  const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match ? match[0] : cleaned);\n  attempts = (parsed.attempts || []).slice(0, 5);\n} catch(e) {}\n\n// Fallback: derive attempts from name if LLM parse failed\nif (attempts.length < 5) {\n  const name = (prep.name || '').trim();\n  const parts = name.split(/\\s+/);\n  const last  = parts.length > 1 ? parts[parts.length - 1] : parts[0];\n  const first = parts.length > 1 ? parts.slice(0, -1).join(' ') : '';\n  const init  = first ? first[0] : '';\n  attempts = [\n    { first_name: first, last_name: last, state: 'NC', city: '' },\n    { first_name: init,  last_name: last, state: 'NC', city: '' },\n    { first_name: '',    last_name: last, state: 'NC', city: '' },\n    { first_name: first, last_name: last, state: '',   city: '' },\n    { first_name: last,  last_name: first,state: 'NC', city: '' },\n  ].slice(0, 5);\n}\n\nreturn [{ json: {\n  attempts,\n  name:              prep.name,\n  property_id:       prep.property_id,\n  session_id:        prep.session_id,\n  queue_id:          prep.queue_id,\n  loop_context:      prep.loop_context,\n  relationship_hint: prep.relationship_hint,\n  age:               prep.age   || '',\n  phone:             prep.phone || '',\n  address:           prep.address || '',\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18632,
+        13696
+      ],
+      "id": "b6f36ed7-ee62-41a4-9fbe-8f45d49c2787",
+      "name": "Parse Attempts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[0].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[0].last_name, \"state\": $('Parse Attempts').first().json.attempts[0].state, \"city\": $('Parse Attempts').first().json.attempts[0].city } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -18432,
+        13696
+      ],
+      "id": "d69d1270-4092-4b1c-95c9-2e51d82c4940",
+      "name": "SkipGenie Try 1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[1].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[1].last_name, \"state\": $('Parse Attempts').first().json.attempts[1].state, \"city\": $('Parse Attempts').first().json.attempts[1].city } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -18072,
+        13696
+      ],
+      "id": "7967f95c-bb74-4f22-934a-3ed1ed88f5e9",
+      "name": "SkipGenie Try 2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[2].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[2].last_name, \"state\": $('Parse Attempts').first().json.attempts[2].state, \"city\": $('Parse Attempts').first().json.attempts[2].city } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -17712,
+        13696
+      ],
+      "id": "7b607a2a-80d8-4e11-a216-ad976206387d",
+      "name": "SkipGenie Try 3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[3].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[3].last_name, \"state\": $('Parse Attempts').first().json.attempts[3].state, \"city\": $('Parse Attempts').first().json.attempts[3].city } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -17352,
+        13696
+      ],
+      "id": "3c5ddf75-750b-42e7-bd83-8583ed68ba59",
+      "name": "SkipGenie Try 4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[4].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[4].last_name, \"state\": $('Parse Attempts').first().json.attempts[4].state, \"city\": $('Parse Attempts').first().json.attempts[4].city } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -16992,
+        13696
+      ],
+      "id": "ad363fb7-d5e5-444f-9e4a-cb404229efe0",
+      "name": "SkipGenie Try 5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "674651dc-cb17-4e8b-a3b7-c91c0fd817cd",
+              "leftValue": "={{ $json.result_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -18252,
+        13696
+      ],
+      "id": "e27d2532-5a63-4343-a743-78b1f4c48501",
+      "name": "Got Results 1?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "036bd325-1561-4dd6-8ce9-0ec80072ebca",
+              "leftValue": "={{ $json.result_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -17892,
+        13696
+      ],
+      "id": "d1e159c6-f39e-4f58-9dff-2f263153d8e4",
+      "name": "Got Results 2?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "32b80319-a85d-4919-8dc9-f38ed188d834",
+              "leftValue": "={{ $json.result_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -17532,
+        13696
+      ],
+      "id": "e2a517ba-7cd9-4719-904b-fa9139b3396c",
+      "name": "Got Results 3?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3230eb9a-7b08-4287-a2d1-c94055da0c9e",
+              "leftValue": "={{ $json.result_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -17172,
+        13696
+      ],
+      "id": "ad93fbd2-d4c5-42db-95d4-662ef1060087",
+      "name": "Got Results 4?"
     }
   ],
   "connections": {
@@ -1499,7 +1733,7 @@
       "main": [
         [
           {
-            "node": "Orch - SkipGenie Result",
+            "node": "Parse Attempts",
             "type": "main",
             "index": 0
           }
@@ -1955,13 +2189,7 @@
     },
     "SkipGenie Search Tool": {
       "ai_tool": [
-        [
-          {
-            "node": "Orch - SkipGenie",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Claude Haiku (SkipGenie Agent)": {
@@ -2014,6 +2242,144 @@
           {
             "node": "Family Assembler",
             "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Attempts": {
+      "main": [
+        [
+          {
+            "node": "SkipGenie Try 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie Try 1": {
+      "main": [
+        [
+          {
+            "node": "Got Results 1?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie Try 2": {
+      "main": [
+        [
+          {
+            "node": "Got Results 2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie Try 3": {
+      "main": [
+        [
+          {
+            "node": "Got Results 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie Try 4": {
+      "main": [
+        [
+          {
+            "node": "Got Results 4?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie Try 5": {
+      "main": [
+        [
+          {
+            "node": "Orch - SkipGenie Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Got Results 1?": {
+      "main": [
+        [
+          {
+            "node": "Orch - SkipGenie Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SkipGenie Try 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Got Results 2?": {
+      "main": [
+        [
+          {
+            "node": "Orch - SkipGenie Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SkipGenie Try 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Got Results 3?": {
+      "main": [
+        [
+          {
+            "node": "Orch - SkipGenie Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SkipGenie Try 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Got Results 4?": {
+      "main": [
+        [
+          {
+            "node": "Orch - SkipGenie Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SkipGenie Try 5",
+            "type": "main",
             "index": 0
           }
         ]
