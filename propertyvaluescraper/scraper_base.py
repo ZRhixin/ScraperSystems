@@ -60,10 +60,8 @@ async def random_delay(min_s: float = 2.0, max_s: float = 5.0):
 
 async def new_page(playwright):
     ua = random.choice(_USER_AGENTS)
-    proxy = _get_proxy()
     browser = await playwright.chromium.launch(
         headless=True,
-        proxy=proxy,
         args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
     )
     context = await browser.new_context(

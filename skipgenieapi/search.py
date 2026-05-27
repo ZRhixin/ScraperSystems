@@ -3,10 +3,23 @@ SkipGenie search API client.
 Runs full browser simulation before every search so server logs are
 indistinguishable from a real Chrome session.
 """
+import os
+
 from curl_cffi import requests
 
 from . import session as sess
 from .browser_sim import simulate_pre_search, _cookies, _UA, BASE_URL
+
+
+def _get_proxy() -> dict | None:
+    host = os.getenv("PROXY_HOST")
+    port = os.getenv("PROXY_PORT")
+    user = os.getenv("PROXY_USER")
+    pwd  = os.getenv("PROXY_PASS")
+    if not host or not port or not user or not pwd:
+        return None
+    return {"https": f"http://{user}:{pwd}@{host}:{port}",
+            "http":  f"http://{user}:{pwd}@{host}:{port}"}
 
 SEARCH_URL = f"{BASE_URL}/api/skipgenie/work_order_search"
 _SEC_CH_UA = '"Not-A.Brand";v="24", "Chromium";v="146"'
@@ -45,7 +58,7 @@ def search_person(
     session_data = sess.load() or {}
     user_id = session_data.get("user_id", "")
 
-    http = requests.Session(impersonate="chrome120")
+    http = requests.Session(impersonate="chrome120", proxies=_get_proxy())
     http.cookies.update(sess.load_cookies())
 
     # Fire pre-search background requests (credits refresh, search history)

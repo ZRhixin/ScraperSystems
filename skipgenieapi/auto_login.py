@@ -74,7 +74,8 @@ def login() -> str | None:
 
     # Use a persistent session — browser_sim reuses same TCP connection after login
     from .browser_sim import simulate_login_page, simulate_post_login
-    http_session = requests.Session(impersonate="chrome120")
+    from .search import _get_proxy
+    http_session = requests.Session(impersonate="chrome120", proxies=_get_proxy())
 
     # Step 1: Load the login page (as a real browser would before filling the form)
     simulate_login_page(http_session)
