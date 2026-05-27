@@ -507,8 +507,12 @@ One invocation = one person. New persons discovered (children from an obit, bene
 - Pass middle_name if known from obituary or deed records.
 
 **Vital status:**
-3. NC Voter (Orch) — Active = living (high confidence). Write voter record immediately. If Active → close: vital_status=living, cascade_needed=false, done.
-4. If voter Removed or not found → check SSDI via Ancestry Search Save (Orch) with collection_id="2442".
+3. NC Voter (Orch) — search by name. Before trusting the result, verify the returned record is the right person: first name must match AND county must match AND city/zip must be consistent with known address (property city or SkipGenie address). A name-only match is not enough. If record does not pass all checks → treat as not found.
+   - Active/Inactive + name match → vital_status=living. Do NOT set cascade_needed=false based on voter alone — continue to court/obituary research to determine heirs.
+   - Removed + name match → investigate further, likely deceased.
+   - Not found or mismatch → unknown, continue to SSDI.
+   Write voter record immediately regardless of result.
+4. If voter not found, mismatch, or Removed → check SSDI via Ancestry Search Save (Orch) with collection_id="2442".
 5. If SSDI confirms death → deceased. If not → try obituary search next.
 
 **Court research (for every deceased person — always):**
@@ -554,7 +558,7 @@ NOTE: Do NOT pass father= or mother= into collection_id="61843" — the obituary
 **Name completeness:** Never queue a single-token name. Resolve partial names via Ancestry parent-mode or Brave Search before queuing. Drop unresolvable partials and note in output.
 
 **Termination conditions (close the branch):**
-- Active voter → living, no cascade.
+- Active voter (name + county + city verified) → vital_status=living. Still run court/obituary to determine cascade — voter status alone does not close the branch.
 - Probate with named persons → cascade to those persons only.
 - Probate with has_issue=false → no children, branch permanently closed.
 - Obituary with explicit children list → that list is the closed heir set.
@@ -644,7 +648,9 @@ nc_voter_orch = http_tool(
     "NC Voter (Orch)", NID["NC Voter (Orch)"],
     (
         "Look up NC voter registration. Pass last_name, first_name, and county. "
-        "Active = living (high confidence). Removed = investigate further. Not found = unknown. "
+        "IMPORTANT: verify the returned name matches the person searched — first name must match. "
+        "If name does not match, treat as not found regardless of status. "
+        "If name matches: Active = living (high confidence), Removed = investigate further. "
         "ALWAYS write result via Write Voter Record (Orch) immediately, even if not found."
     ),
     f"{BASE}/voter/nc/lookup",
