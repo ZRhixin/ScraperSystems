@@ -24,6 +24,22 @@ def _dump(v) -> str:
     return json.dumps(v, default=_json_serial)
 
 
+def _parse_bool(v) -> bool | None:
+    """Coerce agent output to bool or None. Handles string 'null', 'true', 'false'."""
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        if v.lower() in ("null", "none", ""):
+            return None
+        if v.lower() == "true":
+            return True
+        if v.lower() == "false":
+            return False
+    return bool(v)
+
+
 # ---------------------------------------------------------------------------
 # POST /heir/session
 # ---------------------------------------------------------------------------
@@ -1015,8 +1031,8 @@ def write_court_findings(data: dict) -> tuple[int, dict]:
                 data.get("case_number") or None,
                 data.get("case_url") or None,
                 data.get("case_type") or None,
-                data.get("estate_filed"),
-                data.get("had_will"),
+                _parse_bool(data.get("estate_filed")),
+                _parse_bool(data.get("had_will")),
                 _dump(probate_family_tree),
                 _dump(probate_no_issue),
                 _dump(named_persons),
@@ -1519,10 +1535,10 @@ def upsert_person(data: dict) -> tuple[int, dict]:
                 _maybe_set("surviving_spouse_name",   deceased.get("surviving_spouse_name"))
                 if deceased.get("estate_filed") is not None:
                     set_clauses.append("estate_filed = %s")
-                    params.append(deceased["estate_filed"])
+                    params.append(_parse_bool(deceased["estate_filed"]))
                 if deceased.get("had_will") is not None:
                     set_clauses.append("had_will = %s")
-                    params.append(deceased["had_will"])
+                    params.append(_parse_bool(deceased["had_will"]))
                 if deceased.get("family_alive_at_death") is not None:
                     set_clauses.append("family_alive_at_death = %s")
                     params.append(_dump(deceased["family_alive_at_death"]))
@@ -1596,7 +1612,7 @@ def upsert_person(data: dict) -> tuple[int, dict]:
                     vital_status, vital_status_paused,
                     deceased.get("date_of_death"), deceased.get("marital_status_at_death"),
                     deceased.get("surviving_spouse_name"),
-                    deceased.get("estate_filed"), deceased.get("had_will"),
+                    _parse_bool(deceased.get("estate_filed")), _parse_bool(deceased.get("had_will")),
                     _dump(deceased.get("family_alive_at_death") or []),
                     _dump(data.get("deed_transfers") or []),
                     bool(cascade_needed) if cascade_needed is not None else False,
