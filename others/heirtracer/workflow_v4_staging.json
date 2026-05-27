@@ -29,7 +29,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/session",
+        "url": "http://scraper-staging:8000/heir/session",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"property_id\": $json.body.property_id, \"county\": $json.body.county, \"state\": $json.body.state } }}",
@@ -83,7 +83,7 @@
       "parameters": {
         "toolDescription": "Search for a person by name and location using SkipGenie. Returns a list of possible matches, each with: age, date of birth, date of death, deceased status, addresses, phone numbers, emails, possible relatives, and possible associates. Use this first before any other research on a person. Pass as much identifying information as you have — at minimum first name, last name, and state.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "http://scraper-staging:8000/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n    \"first_name\": \"{{ $fromAI('first_name', 'First name of the person to search') }}\",\n    \"last_name\": \"{{ $fromAI('last_name', 'Last name of the person to search') }}\",\n    \"middle_name\": \"{{ $fromAI('middle_name', 'Middle name if known, leave blank if unknown') }}\",\n    \"state\": \"{{ $fromAI('state', 'Two-letter state code, e.g. NC') }}\",\n    \"city\": \"{{ $fromAI('city', 'City of last known address if known, leave blank if unknown') }}\",\n    \"street_address\": \"{{ $fromAI('street_address', 'Street address if known, leave blank if unknown') }}\"\n}",
@@ -102,7 +102,7 @@
       "parameters": {
         "toolDescription": "Loads the full property record, session, transfer history, and existing extractions from the database.\nCall this before calling Title Attorney. Pass the returned data in the Title Attorney call.\nInput: { property_id }\nOutput: { property, session, appraiser_transfer_history, extractions }",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/investigate/property-state",
+        "url": "http://scraper-staging:8000/investigate/property-state",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"property_id\": $fromAI(\"property_id\", \"The property ID to load state for\") } }}",
@@ -122,7 +122,7 @@
       "parameters": {
         "toolDescription": "Search Ancestry.com obituary collection (61843) for the root decedent. Pass first_name + last_name + death_location (e.g. 'Wake, North Carolina') + death_year (infer from SkipGenie dod or last address end-date) + collection_id='61843'. Returns up to 100 obituary records with dob, dod, children[], and spouse fields.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/search",
+        "url": "http://scraper-staging:8000/ancestry/search",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name. Empty string for parent-mode search.\"), \"last_name\": $fromAI(\"last_name\", \"Last name. Empty string for parent-mode search.\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year, empty if unknown\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year, empty if unknown\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'North Carolina'\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: pass decedent's full name as mother. Empty string for direct search.\"), \"father\": $fromAI(\"father\", \"Parent-mode: pass decedent's full name as father. Empty string for direct search.\"), \"collection_id\": $fromAI(\"collection_id\", \"Always '61843' for U.S. Obituary Collection\"), \"count\": 100, \"state\": \"NC\", \"name_x\": \"1_1\" } }}",
@@ -165,7 +165,7 @@
       "parameters": {
         "toolDescription": "Fetch the full text content of an obituary web page. Call this immediately after finding an obituary URL in Brave Search results — pass the URL and get back the full page text. Use this instead of searching again with the URL. Returns plain text extracted from the page.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/fetch-page",
+        "url": "http://scraper-staging:8000/fetch-page",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"The full obituary page URL to fetch, e.g. https://www.wagesfuneralhome.com/obituaries/Tracy-M-Hayes?obId=38043249\"), \"max_chars\": 8000 } }}",
@@ -193,7 +193,7 @@
       "parameters": {
         "toolDescription": "Look up NC voter registration for the root decedent. Pass last_name, first_name. Returns voter status (A=Active, R=Removed).",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/voter/nc/lookup",
+        "url": "http://scraper-staging:8000/voter/nc/lookup",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"first_name\": $fromAI(\"first_name\", \"First name\"), \"county\": $fromAI(\"county\", \"County if known\", \"string\", null) } }}"
@@ -211,7 +211,7 @@
       "parameters": {
         "toolDescription": "Save voter lookup result for the root decedent. Required: session_id, property_id, search_name, search_context='root_research'.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-voter",
+        "url": "http://scraper-staging:8000/heir/write-voter",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched\"), \"search_context\": \"root_research\", \"ncid\": $fromAI(\"ncid\", \"NCID if found\", \"string\", null), \"full_name\": $fromAI(\"full_name\", \"Full name if found\", \"string\", null), \"county\": $fromAI(\"county\", \"County if found\", \"string\", null), \"status\": $fromAI(\"status\", \"Status A/I/R/D if found\", \"string\", null), \"notes\": $fromAI(\"notes\", \"Notes\", \"string\", \"\") } }}"
@@ -229,7 +229,7 @@
       "parameters": {
         "toolDescription": "Search NC courts for the root decedent's estate/probate case. Pass name in 'LAST, FIRST' format (e.g. 'HAYES, LYDIA') and county.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/search",
+        "url": "http://scraper-staging:8000/court/nc/search",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"name\": $fromAI(\"name\", \"Person name in LAST, FIRST format (e.g. HAYES, LYDIA)\"), \"county\": $fromAI(\"county\", \"County\", \"string\", null) } }}"
@@ -247,7 +247,7 @@
       "parameters": {
         "toolDescription": "Get full event timeline for a root decedent's court case. Pass case_url from Court Search Root.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/register_of_actions",
+        "url": "http://scraper-staging:8000/court/nc/register_of_actions",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"case_url\": $fromAI(\"case_url\", \"The case URL from Court Search Root\") } }}"
@@ -265,7 +265,7 @@
       "parameters": {
         "toolDescription": "Download and extract a probate court document for the root decedent. Pass case URL.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/pull-document",
+        "url": "http://scraper-staging:8000/court/nc/pull-document",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"Case URL from Register Actions Root or Court Search\") } }}"
@@ -283,7 +283,7 @@
       "parameters": {
         "toolDescription": "Save root decedent's probate court findings to DB. Required: session_id, property_id, person_name. Include all court and probate data found.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-court-findings",
+        "url": "http://scraper-staging:8000/heir/write-court-findings",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"person_name\": $fromAI(\"person_name\", \"Decedent full name\"), \"case_number\": $fromAI(\"case_number\", \"Case number\", \"string\", null), \"case_url\": $fromAI(\"case_url\", \"Case URL\", \"string\", null), \"case_type\": $fromAI(\"case_type\", \"Case type E/SP\", \"string\", null), \"estate_filed\": $fromAI(\"estate_filed\", \"Whether estate was filed\", \"boolean\", null), \"had_will\": $fromAI(\"had_will\", \"Whether decedent had a will\", \"boolean\", null), \"named_persons\": $fromAI(\"named_persons\", \"Named persons from probate\", \"json\", []), \"probate_family_tree\": $fromAI(\"probate_family_tree\", \"Family tree from probate PDF\", \"json\", []), \"extraction_summary\": $fromAI(\"extraction_summary\", \"Summary of extracted data\", \"string\", \"\") } }}"
@@ -301,7 +301,7 @@
       "parameters": {
         "toolDescription": "(LEGACY — prefer Ancestry Search Save Root) Save Ancestry records to DB. Required: session_id, property_id, search_name, records[].",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-ancestry",
+        "url": "http://scraper-staging:8000/heir/write-ancestry",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched on Ancestry\"), \"records\": $fromAI(\"records\", \"Array of Ancestry records found\", \"json\", []) } }}"
@@ -319,7 +319,7 @@
       "parameters": {
         "toolDescription": "Search Ancestry AND auto-save raw results to DB in one call. REQUIRED: session_id, property_id. Plus one of: first_name+last_name, OR mother=<full name>, OR father=<full name>. Use this instead of the legacy Ancestry Search Root → Write Ancestry Root pair. Returns compact records_summary (with children/parents intact). Three usage modes for the root decedent: (1) DIRECT: first_name+last_name+death_year+death_location+collection_id='61843' to find the obit. (2) PARENT-MODE: mother=<full name> OR father=<full name> + last_name=<surname> + collection_id='61843' to find records where decedent is named as parent. (3) CENSUS: last_name=<surname>+state='NC'+collection_id='2442' for 1940 census household members.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "url": "http://scraper-staging:8000/ancestry/search-and-save",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name. Empty string for parent-mode.\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name. Empty string for parent-mode if needed.\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year, empty if unknown\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year, empty if unknown\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'Wake, North Carolina'\", \"string\", \"\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: decedent full name as mother. Empty for direct.\", \"string\", \"\"), \"father\": $fromAI(\"father\", \"Parent-mode: decedent full name as father. Empty for direct.\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"Ancestry collection_id e.g. 61843 (obits), 2442 (1940 census), or empty for global\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State e.g. 'NC'\", \"string\", \"NC\"), \"name_x\": $fromAI(\"name_x\", \"Exact-match flags, default '1_1'\", \"string\", \"1_1\") } }}"
@@ -337,7 +337,7 @@
       "parameters": {
         "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. REQUIRED: session_id, property_id, record_id (numeric ID OR full URL). The search results card is incomplete — the detail page has the canonical structured Child field with full surnames (e.g. 'Mary Justice' not 'Mary'). Always call this after selecting the best obit candidate from Ancestry Search Save Root.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "url": "http://scraper-staging:8000/ancestry/record-and-save",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"Ancestry record_id (numeric) or full record URL\"), \"state\": $fromAI(\"state\", \"State e.g. 'NC'\", \"string\", \"NC\") } }}"
@@ -355,7 +355,7 @@
       "parameters": {
         "toolDescription": "Fetch all members of the same census household given any Ancestry census record URL. Use after step 4d when you have a census source_url — returns all household members with relationship_to_head. Children appear as 'Son' or 'Daughter'. More reliable than obituary parent searches for finding all siblings.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/household",
+        "url": "http://scraper-staging:8000/ancestry/household",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"record_url\": $fromAI(\"record_url\", \"Ancestry census record URL from step 4d search result source_url field\") } }}"
@@ -372,7 +372,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "url": "http://scraper-staging:8000/heir/upsert-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (function() {\n  try {\n    const raw = $('Root Owner Research').first().json.output || '';\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const m = cleaned.match(/\\{[\\s\\S]*\\}/);\n    const parsed = JSON.parse(m ? m[0] : cleaned);\n    const sess = $('Create Heir Session').first().json;\n    const name = parsed.root_decedent_name || parsed.matched_identity?.full_name || sess.root_decedent_name || 'Unknown';\n    return {\n      session_id:        sess.session_id,\n      property_id:       sess.property_id,\n      input_name:        name,\n      relationship_hint: 'root_decedent',\n      level:             0,\n      research_phase:    'complete',\n      vital_status:      parsed.vital_status || 'deceased',\n      matched_identity:  parsed.matched_identity || {},\n      obituary_url:      parsed.obituary_url || '',\n      obituary_text:     parsed.obituary_text || '',\n      deceased_facts: {\n        date_of_death:           parsed.date_of_death || '',\n        marital_status_at_death: parsed.marital_status_at_death || '',\n        surviving_spouse_name:   parsed.surviving_spouse_name || '',\n        estate_filed:            parsed.estate_filed,\n        had_will:                parsed.had_will,\n        family_alive_at_death:   parsed.cascade_relatives || [],\n      },\n      cascade_relatives: parsed.cascade_relatives || [],\n    };\n  } catch(e) {\n    const sess = $('Create Heir Session').first().json;\n    return { session_id: sess.session_id, property_id: sess.property_id, input_name: sess.root_decedent_name || 'Unknown', level: 0, research_phase: 'complete', vital_status: 'deceased' };\n  }\n})() }}",
@@ -390,7 +390,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "url": "http://scraper-staging:8000/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (function() {\n  try {\n    const raw = $('Root Owner Research').first().json.output || '';\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const m = cleaned.match(/\\{[\\s\\S]*\\}/);\n    const parsed = JSON.parse(m ? m[0] : cleaned);\n    const sess = $('Create Heir Session').first().json;\n    const relatives = parsed.cascade_relatives || [];\n    return {\n      session_id: sess.session_id,\n      property_id: sess.property_id,\n      depth: 1,\n      persons: relatives.map(r => ({\n        name: r.name,\n        relationship_hint: r.relationship_hint || 'child',\n        maiden_name: r.maiden_name || null,\n        depth: 1,\n      })),\n    };\n  } catch(e) {\n    const sess = $('Create Heir Session').first().json;\n    return { session_id: sess.session_id, property_id: sess.property_id, persons: [], _error: e.message };\n  }\n})() }}",
@@ -481,7 +481,7 @@
       "parameters": {
         "toolDescription": "Search SkipGenie for a person. PAID — check DB first (Load Person). Required: first_name, last_name, state='NC'. CRITICAL for good results: always pass city=property city (e.g. 'Wake Forest' not just 'Wake'), zip_code=property zip (e.g. '27587'), AND street_address=property street address (e.g. '631 E Nelson Ave'). The property address anchors the search — family members typically lived nearby (same street, same zip). Without street+zip, common names like 'Mary Justice' return wrong people or no results. Also pass middle_name if known. NEVER call twice for the same person. Save result immediately via Write Person (Orch). possible_relatives and possible_associates are identity cross-check signals ONLY — not heirs. Pick the result where: deceased=true matches expectation, address is closest to property, and known family names appear in possible_relatives or possible_associates.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "http://scraper-staging:8000/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name\"), \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"middle_name\": $fromAI(\"middle_name\", \"Middle name if known, else empty string\", \"string\", \"\"), \"street_address\": $fromAI(\"street_address\", \"Street address if known from SkipGenie or deed records, else empty string\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State, default NC\", \"string\", \"NC\"), \"city\": $fromAI(\"city\", \"City or county name — REQUIRED. Name+state alone returns nothing. Pass property county e.g. Wake or city e.g. Raleigh\"), \"zip_code\": $fromAI(\"zip_code\", \"ZIP code if known, else empty string\", \"string\", \"\") } }}"
@@ -507,7 +507,7 @@
       "parameters": {
         "toolDescription": "Look up NC voter registration. Pass last_name, first_name, and county. Active = living (high confidence). Removed = investigate further. Not found = unknown. ALWAYS write result via Write Voter Record (Orch) immediately, even if not found.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/voter/nc/lookup",
+        "url": "http://scraper-staging:8000/voter/nc/lookup",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"first_name\": $fromAI(\"first_name\", \"First name\"), \"county\": $fromAI(\"county\", \"County if known\", \"string\", null) } }}"
@@ -525,7 +525,7 @@
       "parameters": {
         "toolDescription": "Search Ancestry AND auto-save results to DB. REQUIRED: session_id, property_id. Three usage modes: (1) OBITUARY: first_name+last_name+death_year+death_location+collection_id='61843' — finds person's own obit. After picking best hit, call Ancestry Record (Orch) for the detail page — it has the full children/survivors list. (2) CENSUS: first_name+last_name+birth_year+state='NC'+collection_id='2442' — find a census record for this person. Pass the returned source_url to Ancestry Household (Orch) to get all household members (children listed as Son/Daughter). (3) SSDI: first_name+last_name+death_year+collection_id='2442' — confirm death date and last residence. WARNING: passing father= or mother= into collection_id='61843' does NOT reliably find children. The obituary index does not store parent names as structured fields — use Ancestry Household instead. Collections: 61843=obituaries, 2442=census/SSDI, 63277=family trees.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "url": "http://scraper-staging:8000/ancestry/search-and-save",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name. Empty for parent-mode.\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name.\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'Wake, North Carolina'\", \"string\", \"\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: full name as mother. Empty for direct.\", \"string\", \"\"), \"father\": $fromAI(\"father\", \"Parent-mode: full name as father. Empty for direct.\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"e.g. 61843 (obits), 2442 (SSDI/census), 63277 (trees)\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State e.g. NC\", \"string\", \"NC\"), \"name_x\": $fromAI(\"name_x\", \"Exact-match flags, default 1_1\", \"string\", \"1_1\") } }}"
@@ -543,7 +543,7 @@
       "parameters": {
         "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. ALWAYS call after selecting best obit candidate from Ancestry Search Save. REQUIRED: session_id, property_id, record_id (source_url preferred — bare numeric ID 404s for Newspapers.com). Detail page has canonical full-name children list (e.g. 'Mary Justice' not 'Mary').",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "url": "http://scraper-staging:8000/ancestry/record-and-save",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"Ancestry record_id (source_url preferred) or numeric ID\"), \"state\": $fromAI(\"state\", \"State e.g. NC\", \"string\", \"NC\") } }}"
@@ -576,7 +576,7 @@
       "parameters": {
         "toolDescription": "Fetch the full text content of an obituary web page. Call this immediately after finding an obituary URL in Brave Search results — pass the URL and get back the full page text. Use this instead of searching again with the URL. Returns plain text extracted from the page.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/fetch-page",
+        "url": "http://scraper-staging:8000/fetch-page",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"The full obituary page URL to fetch, e.g. https://www.wagesfuneralhome.com/obituaries/Tracy-M-Hayes?obId=38043249\"), \"max_chars\": 8000 } }}",
@@ -596,7 +596,7 @@
       "parameters": {
         "toolDescription": "### Wake Deeds\n```\nSearch Wake County Register of Deeds by name or document number.\nUse for name searches — NOT for pulling a deed by book/page.\n\nFor name search:\n  { \"search_type\": \"name\", \"surname\": \"HAYES\", \"first_name\": \"LYDIA\", \"role\": \"grantee\" }\n  role options: grantor | grantee | both\n\nFor document number search:\n  { \"search_type\": \"document\", \"document_number\": \"004714-00624\" }\n\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/county/wake/deeds",
+        "url": "http://scraper-staging:8000/county/wake/deeds",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"search_type\": \"{{ $fromAI('search_type', 'name | document') }}\",\n  \"surname\": \"{{ $fromAI('surname', 'Last name for name search') }}\",\n  \"first_name\": \"{{ $fromAI('first_name', 'First name for name search') }}\",\n  \"role\": \"{{ $fromAI('role', 'grantor | grantee | both') }}\",\n  \"document_number\": \"{{ $fromAI('document_number', 'Document number for document search example 004714-00624') }}\"\n}",
@@ -616,7 +616,7 @@
       "parameters": {
         "toolDescription": "### Buncombe Deeds\n```\nSearch Buncombe County Register of Deeds.\nUse when county is \"buncombe\".\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/county/buncombe/deeds",
+        "url": "http://scraper-staging:8000/county/buncombe/deeds",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{\n  {\n    search_type: $fromAI(\"search_type\", \"name | document\"),\n    surname: $fromAI(\"surname\", \"Last name for name search\"),\n    first_name: $fromAI(\"first_name\", \"First name for name search\"),\n    role: $fromAI(\"role\", \"grantor | grantee | both\"),\n    document_number: $fromAI(\"document_number\", \"Document number for document search\")\n  }\n}}",
@@ -635,7 +635,7 @@
       "parameters": {
         "toolDescription": "### Mecklenburg Deeds\n```\nSearch Mecklenburg County Register of Deeds.\nUse when county is \"mecklenburg\".\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/county/mecklenburg/deeds",
+        "url": "http://scraper-staging:8000/county/mecklenburg/deeds",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{\n  search_type: $fromAI(\"search_type\", \"name | document\"),\n  surname: $fromAI(\"surname\", \"Last name for name search\"),\n  first_name: $fromAI(\"first_name\", \"First name for name search\"),\n  role: $fromAI(\"role\", \"grantor | grantee | both\"),\n  document_number: $fromAI(\"document_number\", \"Document number for document search\")\n}}",
@@ -662,7 +662,7 @@
       "parameters": {
         "toolDescription": "Fetch all members of the same census household given any Ancestry census record URL. Use when a person's children are not found in their obituary or probate documents. How to use: first call Ancestry Search Save (Orch) with collection_id='2442' to find a census record for this person or a confirmed family member — then pass the returned source_url here. Returns all household members with relationship_to_head (Son, Daughter, Wife, Head, etc.). Children appear as 'Son' or 'Daughter'. This is the most reliable way to find children not mentioned in an obituary — census records capture everyone living in the household.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/household",
+        "url": "http://scraper-staging:8000/ancestry/household",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"record_url\": $fromAI(\"record_url\", \"Ancestry census record URL from a prior search result (source_url field)\") } }}"
@@ -680,7 +680,7 @@
       "parameters": {
         "toolDescription": "Load full property record including street address, city, zip, and county. Call ONCE at the start of a session before your first SkipGenie call. Use property.address.street, property.address.city, property.address.zip as SkipGenie inputs. Family members of the deceased almost always lived nearby — the property address is the best geographic anchor for finding ANY person in this family, not just the root decedent. Pass property_id to retrieve.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/investigate/property-state",
+        "url": "http://scraper-staging:8000/investigate/property-state",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
@@ -698,7 +698,7 @@
       "parameters": {
         "toolDescription": "Load person's existing research record from DB. Call FIRST before any external API to avoid duplicate paid calls. If research_phase='complete' → skip all tool calls, person is done. If matched_identity is populated → skip SkipGenie. Pass session_id and name.",
         "method": "GET",
-        "url": "http://127.0.0.1:8000/heir/load-person",
+        "url": "http://scraper-staging:8000/heir/load-person",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -726,7 +726,7 @@
       "parameters": {
         "toolDescription": "Load Ancestry records saved for this session and person. Pass session_id and optionally search_name to filter. Check before running Ancestry Search Save.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/ancestry-records",
+        "url": "http://scraper-staging:8000/heir/ancestry-records",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"search_name\": $fromAI(\"search_name\", \"Person name to filter\", \"string\", null) } }}"
@@ -744,7 +744,7 @@
       "parameters": {
         "toolDescription": "Load court/probate findings for this session and person. Check before running Court Search. Pass session_id.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/court-findings",
+        "url": "http://scraper-staging:8000/heir/court-findings",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"person_name\": $fromAI(\"person_name\", \"Person name to filter\", \"string\", null) } }}"
@@ -762,7 +762,7 @@
       "parameters": {
         "toolDescription": "Load voter records saved for this session. Check before running NC Voter Lookup. Pass session_id.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/voter-records",
+        "url": "http://scraper-staging:8000/heir/voter-records",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\") } }}"
@@ -780,7 +780,7 @@
       "parameters": {
         "toolDescription": "Create or update a person record in DB (upsert). Safe to call multiple times. Call immediately after SkipGenie with matched_identity. Call after vital status determined. Call at end with cascade_needed, cascade_relatives, research_phase='complete'. REQUIRED: session_id, property_id, input_name, vital_status.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "url": "http://scraper-staging:8000/heir/upsert-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"\"),\n  \"cascade_needed\":    $fromAI(\"cascade_needed\", \"Whether cascade research needed\", \"boolean\", false),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"deceased_facts\":    $fromAI(\"deceased_facts\", \"NC Ch.29 required facts\", \"json\", {}),\n  \"obituary_url\":      $fromAI(\"obituary_url\", \"Obituary URL\", \"string\", \"\"),\n  \"obituary_text\":     $fromAI(\"obituary_text\", \"Full obituary text\", \"string\", \"\"),\n  \"estate_filed\":      $fromAI(\"estate_filed\", \"Whether estate was filed\", \"boolean\", null),\n  \"had_will\":          $fromAI(\"had_will\", \"Whether had a will\", \"boolean\", null),\n  \"cascade_relatives\": $fromAI(\"cascade_relatives\", \"Heir list\", \"json\", []),\n  \"maiden_name\":       $fromAI(\"maiden_name\", \"Maiden name if applicable\", \"string\", \"\"),\n  \"notes\":             $fromAI(\"notes\", \"Research notes\", \"string\", \"\"),\n  \"relationship_hint\": $fromAI(\"relationship_hint\", \"Relationship to root decedent\", \"string\", \"\"),\n  \"queue_id\":          $fromAI(\"queue_id\", \"Queue item ID\", \"number\", null)\n} }}"
@@ -798,7 +798,7 @@
       "parameters": {
         "toolDescription": "Save voter lookup result to DB. Call after EVERY NC Voter Lookup, including not-found. Required: session_id, property_id, search_name. Saves full_name (may be married name), county, status.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-voter",
+        "url": "http://scraper-staging:8000/heir/write-voter",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched\"), \"search_context\": $fromAI(\"search_context\", \"Context e.g. orchestrator\", \"string\", \"orchestrator\"), \"ncid\": $fromAI(\"ncid\", \"NCID if found\", \"string\", null), \"full_name\": $fromAI(\"full_name\", \"Full legal name if found — may differ (married name)\", \"string\", null), \"county\": $fromAI(\"county\", \"County if found\", \"string\", null), \"status\": $fromAI(\"status\", \"Status A/I/R/D if found\", \"string\", null), \"notes\": $fromAI(\"notes\", \"Notes\", \"string\", \"\") } }}"
@@ -816,7 +816,7 @@
       "parameters": {
         "toolDescription": "Add new persons to the research queue. Use when new heirs/children are discovered during research. Required: session_id, property_id, persons=[{name, relationship_hint, maiden_name}]. Server deduplicates. Do NOT queue: the current person, single-token names, 'Estate of', 'Heirs of'.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "url": "http://scraper-staging:8000/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"depth\": $fromAI(\"depth\", \"Depth level for cascade\", \"number\", 1), \"persons\": $fromAI(\"persons\", \"Array of {name, relationship_hint, maiden_name} to queue\", \"json\", []) } }}"
@@ -896,7 +896,7 @@
       "parameters": {
         "toolDescription": "Search Ancestry AND auto-save results to DB. Pass session_id, property_id, first_name, last_name, death_year, death_location, collection_id.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "url": "http://scraper-staging:8000/ancestry/search-and-save",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Birth year\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Death year\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"Collection ID\", \"string\", \"61843\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\") } }}"
@@ -914,7 +914,7 @@
       "parameters": {
         "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. Use source_url (preferred) or record_id. Returns canonical full-name children list.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "url": "http://scraper-staging:8000/ancestry/record-and-save",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"source_url preferred, or numeric record_id\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\") } }}"
@@ -976,7 +976,7 @@
       "parameters": {
         "toolDescription": "Search SkipGenie for a person. PAID — only call once. Pass first_name, last_name, street_address, city, zip_code, state.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "http://scraper-staging:8000/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name\"), \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"middle_name\": $fromAI(\"middle_name\", \"Middle name if known\", \"string\", \"\"), \"street_address\": $fromAI(\"street_address\", \"Street address\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\"), \"city\": $fromAI(\"city\", \"City\", \"string\", \"\"), \"zip_code\": $fromAI(\"zip_code\", \"ZIP code\", \"string\", \"\") } }}"
@@ -994,7 +994,7 @@
       "parameters": {
         "toolDescription": "Create or update a person record in DB. Call immediately after SkipGenie with matched_identity. Required: session_id, property_id, input_name, vital_status.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "url": "http://scraper-staging:8000/heir/upsert-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"skipgenie\"),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"notes\":             $fromAI(\"notes\", \"Notes\", \"string\", \"\")\n} }}"
@@ -1011,7 +1011,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/complete-person",
+        "url": "http://scraper-staging:8000/heir/complete-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"queue_id\": $('Orchestrator Webhook').first().json.body.queue_id } }}",
@@ -1029,7 +1029,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/next-person",
+        "url": "http://scraper-staging:8000/heir/next-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $('Orchestrator Webhook').first().json.body.session_id } }}",
@@ -1173,7 +1173,7 @@
       "parameters": {
         "toolDescription": "### Court Search\n```\nSearch NC Clerk of Superior Court by party name.\nUse when the Title Attorney needs to find estate, probate, foreclosure, or judgment cases\nfor a specific person or entity.\nRequired: name (full name or last name). Optional: county.\nInput: { name: \"HAYES\" | \"HAYES, LYDIA\", county?: \"Wake\" }\nReturns: list of cases with case_number, case_type, filing_date, parties, case_url.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/search",
+        "url": "http://scraper-staging:8000/court/nc/search",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -1202,7 +1202,7 @@
       "parameters": {
         "toolDescription": "### Register of Actions\n```\nGet the full event timeline for a specific court case.\nCall after Court Search when you need to inspect a case in detail.\nReturns the foreclosure stage and all case events with dates and descriptions.\nRequired: case_url (from Court Search results).\nInput: { case_url: \"...\" }\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/register_of_actions",
+        "url": "http://scraper-staging:8000/court/nc/register_of_actions",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"case_url\": \"{{ $fromAI('case_url', 'URL of the court case from Court Search results') }}\"\n}",
@@ -1222,7 +1222,7 @@
       "parameters": {
         "toolDescription": "### Court Document Pull\n```\nDownload and Claude-extract a probate court document from the NC courts portal.\nUse when Court Search returns a probate/estate case — pass the case URL to get\nthe full family tree PDF extracted as structured JSON with named_persons and\nfamily_tree (including has_issue=false for confirmed no-children branches).\nInput: { url: \"https://portal-nc.tylertech.cloud/app/RegisterOfActions/...\" }\nOutput: { case_id, documents: [{ url, extraction: { named_persons, family_tree, decedent_name, flags, ... } }] }\nThe extraction.family_tree[].has_issue field is critical:\n  false = confirmed no children (branch extinct)\n  true  = confirmed has children\n  null  = not stated\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/pull-document",
+        "url": "http://scraper-staging:8000/court/nc/pull-document",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"Full NC courts portal URL for the probate case, e.g. https://portal-nc.tylertech.cloud/app/RegisterOfActions/#/ENCRYPTED_ID/anon/portalembed\") } }}",
@@ -1241,7 +1241,7 @@
       "parameters": {
         "toolDescription": "Save probate court document findings to the database. REQUIRED: call this after Court Document Pull successfully extracts any probate data, AND after Court Search finds an estate case even if document pull fails. Required: session_id, property_id, person_name. Pass all available fields from court search and document extraction.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-court-findings",
+        "url": "http://scraper-staging:8000/heir/write-court-findings",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID from input context\"), \"property_id\": $fromAI(\"property_id\", \"Property ID from input context\"), \"person_name\": $fromAI(\"person_name\", \"Full name of the person whose estate case was found\"), \"case_number\": $fromAI(\"case_number\", \"Court case number e.g. 24E002839-910\"), \"case_url\": $fromAI(\"case_url\", \"Full URL of the court case from Court Search\"), \"case_type\": $fromAI(\"case_type\", \"E for Estate, SP for Special Proceedings\"), \"estate_filed\": $fromAI(\"estate_filed\", \"true if estate case found\", \"boolean\"), \"had_will\": $fromAI(\"had_will\", \"true=testate false=intestate null=unknown\"), \"probate_family_tree\": $fromAI(\"probate_family_tree\", \"family_tree array from document extraction, or empty array\"), \"probate_no_issue\": $fromAI(\"probate_no_issue\", \"names confirmed has_issue=false, or empty array\"), \"named_persons\": $fromAI(\"named_persons\", \"named_persons array from extraction, or empty array\"), \"documents\": $fromAI(\"documents\", \"documents array from pull result, or empty array\"), \"notes\": $fromAI(\"notes\", \"Any notes about the probate research\") } }}",
@@ -1343,7 +1343,7 @@
       "parameters": {
         "toolDescription": "Load all person records for this session — vital_status, cascade_needed, cascade_relatives, estate_filed, obituary data for every person researched. Required: session_id.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/persons",
+        "url": "http://scraper-staging:8000/heir/persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\") } }}"
@@ -1361,7 +1361,7 @@
       "parameters": {
         "toolDescription": "Write the final resolved family tree to DB. Call once at the end after applying NC Ch. 29 to all branches. Required: session_id, property_id, root_decedent_name, heir_tree (array of heir nodes with share_fraction and basis).",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write",
+        "url": "http://scraper-staging:8000/heir/write",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"root_decedent_name\": $fromAI(\"root_decedent_name\", \"Full name of the root decedent (e.g. Lydia L Hayes)\"), \"heir_tree\": $fromAI(\"heir_tree\", \"Complete heir tree array\", \"json\", []), \"notes\": $fromAI(\"notes\", \"Summary notes\", \"string\", \"\") } }}"
