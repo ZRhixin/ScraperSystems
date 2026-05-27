@@ -45,6 +45,25 @@ def gpt_model(name: str, node_id: str) -> dict:
         "credentials": OPENAI_CRED,
     }
 
+def agent_tool_node(name: str, node_id: str, tool_description: str, system_msg: str, text_expr: str, max_iter: int = 20) -> dict:
+    """Agent node wired as a tool to a parent agent (agentTool type)."""
+    return {
+        "id": node_id,
+        "name": name,
+        "type": "@n8n/n8n-nodes-langchain.agentTool",
+        "typeVersion": 3,
+        "position": [0, 0],
+        "rewireOutputLogTo": "ai_tool",
+        "parameters": {
+            "toolDescription": tool_description,
+            "text": text_expr,
+            "options": {
+                "systemMessage": system_msg,
+                "maxIterations": max_iter,
+            },
+        },
+    }
+
 def agent_node(name: str, node_id: str, system_msg: str, text_expr: str, max_iter: int = 30) -> dict:
     return {
         "id": node_id,
@@ -887,17 +906,24 @@ first_name, last_name, death_year, death_location (e.g. "Wake, North Carolina"),
   "notes": "Brief selection rationale."
 }"""
 
-ancestry_selector_agent = agent_node(
+ancestry_selector_agent = agent_tool_node(
     "Ancestry Selector Agent", NID["Ancestry Selector Agent"],
+    tool_description=(
+        "Search Ancestry for a person's obituary and return the single best NC match. "
+        "Handles full search + NC candidate selection + Ancestry Record detail internally. "
+        "Returns {found, person_name, dob, dod, death_location, children[], obit_text, confidence}. "
+        "Use INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context. "
+        "Pass: first_name, last_name, death_year, death_location (e.g. 'Wake, North Carolina'), session_id, property_id."
+    ),
     system_msg=ANCESTRY_SELECTOR_PROMPT,
     text_expr=(
         '={{ `Select best Ancestry obituary match.\n\n'
-        'First Name: ${$fromAI("first_name")}\n'
-        'Last Name: ${$fromAI("last_name")}\n'
-        'Death Year: ${$fromAI("death_year", "", "string", "")}\n'
-        'Death Location: ${$fromAI("death_location", "", "string", "")}\n'
-        'Session ID: ${$fromAI("session_id")}\n'
-        'Property ID: ${$fromAI("property_id")}` }}'
+        'First Name: ${$fromAI("first_name", "First name")}\n'
+        'Last Name: ${$fromAI("last_name", "Last name")}\n'
+        'Death Year: ${$fromAI("death_year", "Estimated death year", "string", "")}\n'
+        'Death Location: ${$fromAI("death_location", "e.g. Wake, North Carolina", "string", "")}\n'
+        'Session ID: ${$fromAI("session_id", "Session ID")}\n'
+        'Property ID: ${$fromAI("property_id", "Property ID")}` }}'
     ),
     max_iter=10,
 )
@@ -977,20 +1003,28 @@ first_name, last_name, street_address, city, zip_code, state, session_id, proper
   "notes": "Brief match rationale."
 }"""
 
-skipgenie_resolver_agent = agent_node(
+skipgenie_resolver_agent = agent_tool_node(
     "SkipGenie Resolver Agent", NID["SkipGenie Resolver Agent"],
+    tool_description=(
+        "Resolve a person's identity via SkipGenie and write the result to DB. "
+        "Handles search + best-match selection + DB write internally. "
+        "Returns slim identity {matched, subject_name, dob, dod, deceased, last_address, possible_relatives}. "
+        "Use INSTEAD of calling SkipGenie (Orch) directly — avoids large raw results in context. "
+        "PAID — call only once per person. "
+        "Pass: first_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name."
+    ),
     system_msg=SKIPGENIE_RESOLVER_PROMPT,
     text_expr=(
         '={{ `Resolve identity for person.\n\n'
-        'First Name: ${$fromAI("first_name")}\n'
-        'Last Name: ${$fromAI("last_name")}\n'
-        'Street Address: ${$fromAI("street_address", "", "string", "")}\n'
-        'City: ${$fromAI("city", "", "string", "")}\n'
-        'Zip: ${$fromAI("zip_code", "", "string", "")}\n'
-        'State: ${$fromAI("state", "", "string", "NC")}\n'
-        'Session ID: ${$fromAI("session_id")}\n'
-        'Property ID: ${$fromAI("property_id")}\n'
-        'Person Name: ${$fromAI("person_name")}` }}'
+        'First Name: ${$fromAI("first_name", "First name")}\n'
+        'Last Name: ${$fromAI("last_name", "Last name")}\n'
+        'Street Address: ${$fromAI("street_address", "Property street address", "string", "")}\n'
+        'City: ${$fromAI("city", "City", "string", "")}\n'
+        'Zip: ${$fromAI("zip_code", "ZIP code", "string", "")}\n'
+        'State: ${$fromAI("state", "State", "string", "NC")}\n'
+        'Session ID: ${$fromAI("session_id", "Session ID")}\n'
+        'Property ID: ${$fromAI("property_id", "Property ID")}\n'
+        'Person Name: ${$fromAI("person_name", "Full name as queued")}` }}'
     ),
     max_iter=8,
 )

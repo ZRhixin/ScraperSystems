@@ -843,15 +843,16 @@
     {
       "id": "a62cb79f-1a53-5a5a-8261-c790a66ebb33",
       "name": "Ancestry Selector Agent",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
       "position": [
         740,
         1820
       ],
+      "rewireOutputLogTo": "ai_tool",
       "parameters": {
-        "promptType": "define",
-        "text": "={{ `Select best Ancestry obituary match.\n\nFirst Name: ${$fromAI(\"first_name\")}\nLast Name: ${$fromAI(\"last_name\")}\nDeath Year: ${$fromAI(\"death_year\", \"\", \"string\", \"\")}\nDeath Location: ${$fromAI(\"death_location\", \"\", \"string\", \"\")}\nSession ID: ${$fromAI(\"session_id\")}\nProperty ID: ${$fromAI(\"property_id\")}` }}",
+        "toolDescription": "Search Ancestry for a person's obituary and return the single best NC match. Handles full search + NC candidate selection + Ancestry Record detail internally. Returns {found, person_name, dob, dod, death_location, children[], obit_text, confidence}. Use INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context. Pass: first_name, last_name, death_year, death_location (e.g. 'Wake, North Carolina'), session_id, property_id.",
+        "text": "={{ `Select best Ancestry obituary match.\n\nFirst Name: ${$fromAI(\"first_name\", \"First name\")}\nLast Name: ${$fromAI(\"last_name\", \"Last name\")}\nDeath Year: ${$fromAI(\"death_year\", \"Estimated death year\", \"string\", \"\")}\nDeath Location: ${$fromAI(\"death_location\", \"e.g. Wake, North Carolina\", \"string\", \"\")}\nSession ID: ${$fromAI(\"session_id\", \"Session ID\")}\nProperty ID: ${$fromAI(\"property_id\", \"Property ID\")}` }}",
         "options": {
           "systemMessage": "You are the Ancestry Selector. Search Ancestry for ONE person's obituary, select the best NC match, fetch the full record detail, and return a structured result.\n\n## Input (from parent agent)\nfirst_name, last_name, death_year, death_location (e.g. \"Wake, North Carolina\"), session_id, property_id\n\n## Steps\n\n1. Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id=\"61843\", session_id, property_id. Results auto-save to DB.\n\n2. Review ALL returned records_summary entries:\n   - STEP A — Hard reject: any record whose death_location contains a US state other than \"North Carolina\" or \"NC\" is disqualifying.\n   - STEP B — Among NC records, prefer: (1) dod year matches death_year ±2; (2) children[] overlap with known relatives; (3) dob plausible for expected age. Reject records with dod before 1960.\n   - STEP C — If no NC record passes, return found=false immediately.\n\n3. If best candidate found: call Ancestry Record (AS) using source_url (preferred over bare record_id). Gets canonical full-name children list. ALWAYS do this step.\n\n4. Return ONLY this JSON:\n{\n  \"found\": true/false,\n  \"record_id\": \"...\",\n  \"source_url\": \"...\",\n  \"person_name\": \"...\",\n  \"dob\": \"...\",\n  \"dod\": \"...\",\n  \"death_location\": \"...\",\n  \"children\": [\"FIRST LAST\"],\n  \"obit_text\": \"...full text if available...\",\n  \"confidence\": \"high|medium|low\",\n  \"notes\": \"Brief selection rationale.\"\n}",
           "maxIterations": 10
@@ -922,15 +923,16 @@
     {
       "id": "2443ce4c-2a5a-5ea8-ab26-a500488981be",
       "name": "SkipGenie Resolver Agent",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
       "position": [
         740,
         2000
       ],
+      "rewireOutputLogTo": "ai_tool",
       "parameters": {
-        "promptType": "define",
-        "text": "={{ `Resolve identity for person.\n\nFirst Name: ${$fromAI(\"first_name\")}\nLast Name: ${$fromAI(\"last_name\")}\nStreet Address: ${$fromAI(\"street_address\", \"\", \"string\", \"\")}\nCity: ${$fromAI(\"city\", \"\", \"string\", \"\")}\nZip: ${$fromAI(\"zip_code\", \"\", \"string\", \"\")}\nState: ${$fromAI(\"state\", \"\", \"string\", \"NC\")}\nSession ID: ${$fromAI(\"session_id\")}\nProperty ID: ${$fromAI(\"property_id\")}\nPerson Name: ${$fromAI(\"person_name\")}` }}",
+        "toolDescription": "Resolve a person's identity via SkipGenie and write the result to DB. Handles search + best-match selection + DB write internally. Returns slim identity {matched, subject_name, dob, dod, deceased, last_address, possible_relatives}. Use INSTEAD of calling SkipGenie (Orch) directly — avoids large raw results in context. PAID — call only once per person. Pass: first_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name.",
+        "text": "={{ `Resolve identity for person.\n\nFirst Name: ${$fromAI(\"first_name\", \"First name\")}\nLast Name: ${$fromAI(\"last_name\", \"Last name\")}\nStreet Address: ${$fromAI(\"street_address\", \"Property street address\", \"string\", \"\")}\nCity: ${$fromAI(\"city\", \"City\", \"string\", \"\")}\nZip: ${$fromAI(\"zip_code\", \"ZIP code\", \"string\", \"\")}\nState: ${$fromAI(\"state\", \"State\", \"string\", \"NC\")}\nSession ID: ${$fromAI(\"session_id\", \"Session ID\")}\nProperty ID: ${$fromAI(\"property_id\", \"Property ID\")}\nPerson Name: ${$fromAI(\"person_name\", \"Full name as queued\")}` }}",
         "options": {
           "systemMessage": "You are the SkipGenie Identity Resolver. Find and confirm the identity of ONE person using SkipGenie and write the result to the database.\n\n## Input (from parent agent)\nfirst_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name (as queued)\n\n## Steps\n\n1. Call SkipGenie (SR) with ALL provided address fields: first_name, last_name, street_address, city, zip_code, state. The property address is the best geographic anchor — family members typically lived nearby.\n\n2. Select the best match:\n   - Prefer: deceased=true if expected deceased\n   - Prefer: address closest to the property address\n   - Prefer: possible_relatives contains known family names\n   - If no convincing match: matched=false\n\n3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status=\"unknown\", research_phase=\"skipgenie\", matched_identity.\n\n4. Return ONLY this JSON:\n{\n  \"matched\": true/false,\n  \"subject_name\": \"...\",\n  \"age\": \"...\",\n  \"dob\": \"...\",\n  \"dod\": \"...\",\n  \"deceased\": true/false,\n  \"last_address\": \"...\",\n  \"city\": \"...\",\n  \"state\": \"...\",\n  \"possible_relatives\": [{\"name\": \"...\", \"age\": \"...\", \"pid\": \"...\"}],\n  \"pid\": \"...\",\n  \"notes\": \"Brief match rationale.\"\n}",
           "maxIterations": 8
@@ -2092,7 +2094,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "d693130d-4933-468a-95d7-8ce3356ddd34",
+  "versionId": "943e2237-da9e-4621-9de3-4ede2d6a61c8",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },
