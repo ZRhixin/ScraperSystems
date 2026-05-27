@@ -115,7 +115,6 @@ def _parse_result(body: dict) -> dict:
             "phones": record.get("phones", []),
             "emails": record.get("emails", []),
             "possible_relatives": record.get("possibleRelatives", []),
-            "possible_associates": record.get("possibleAssociates", []),
             "pid": record.get("pid", ""),
         })
     return {

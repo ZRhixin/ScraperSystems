@@ -242,8 +242,20 @@ NID = {k: nid(k) for k in [
     "Write Voter Record (Orch)",
     "Queue Persons (Orch)",
 
-    # Orchestrator tools — sub-agent
+    # Orchestrator tools — sub-agents (HTTP webhook)
     "Court Researcher Tool",
+
+    # Ancestry Selector Agent (AI tool wired to Orchestrator)
+    "Ancestry Selector Agent",
+    "Ancestry Selector Model",
+    "Ancestry Search Save (AS)",
+    "Ancestry Record (AS)",
+
+    # SkipGenie Resolver Agent (AI tool wired to Orchestrator)
+    "SkipGenie Resolver Agent",
+    "SkipGenie Resolver Model",
+    "SkipGenie (SR)",
+    "Write Person (SR)",
 
     # Orchestrator queue management nodes
     "Mark Person Done (Orch)",
@@ -466,7 +478,7 @@ One invocation = one person. New persons discovered (children from an obit, bene
 
 **Start every new person with:**
 1. Load Person (Orch) — check what's already saved. If research_phase="complete", skip all tool calls.
-2. If matched_identity is empty → call SkipGenie (Orch). NEVER call SkipGenie twice for same person. IMMEDIATELY write via Write Person (Orch) with matched_identity before doing anything else.
+2. If matched_identity is empty → call SkipGenie Resolver Agent (AI tool). It handles the search + best-match selection + DB write internally and returns a slim identity JSON. NEVER call SkipGenie (Orch) directly for identity lookup — it dumps large raw results into context. NEVER call SkipGenie twice for same person.
 
 **SkipGenie address strategy — more fields = better match:**
 - Always pass city=property city (e.g. "Wake Forest") AND zip_code=property zip (e.g. "27587"). County alone is too broad.
@@ -486,8 +498,8 @@ One invocation = one person. New persons discovered (children from an obit, bene
    - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], done permanently.
 
 **Obituary research (only if no probate found with named persons):**
-7. Ancestry Search Save (Orch) — collection_id="61843", first_name+last_name+death_location="[County], NC"+death_year. Saves automatically to DB.
-8. Ancestry Record (Orch) — ALWAYS call after picking best obit candidate. Use source_url (not bare record_id). Gets canonical full-name children list.
+7. Call Ancestry Selector Agent (AI tool) — pass first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. It handles full search + NC candidate selection + Ancestry Record detail internally. Returns {found, children[], obit_text, confidence}. Use this INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context.
+8. Only fall back to Ancestry Search Save (Orch) directly if Ancestry Selector returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843).
 9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: "[FULL NAME] obituary [county] NC [year]".
 10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.
 
@@ -842,6 +854,186 @@ court_researcher_tool = http_tool(
     '={{ { "person_name": $fromAI("person_name", "Full name of person to research"), "county": $fromAI("county", "NC county for court search"), "session_id": $fromAI("session_id", "Session ID"), "property_id": $fromAI("property_id", "Property ID") } }}',
 )
 
+# ── Ancestry Selector Agent (AI tool connected to Orchestrator) ───────────────
+
+ANCESTRY_SELECTOR_PROMPT = """You are the Ancestry Selector. Search Ancestry for ONE person's obituary, select the best NC match, fetch the full record detail, and return a structured result.
+
+## Input (from parent agent)
+first_name, last_name, death_year, death_location (e.g. "Wake, North Carolina"), session_id, property_id
+
+## Steps
+
+1. Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id="61843", session_id, property_id. Results auto-save to DB.
+
+2. Review ALL returned records_summary entries:
+   - STEP A — Hard reject: any record whose death_location contains a US state other than "North Carolina" or "NC" is disqualifying.
+   - STEP B — Among NC records, prefer: (1) dod year matches death_year ±2; (2) children[] overlap with known relatives; (3) dob plausible for expected age. Reject records with dod before 1960.
+   - STEP C — If no NC record passes, return found=false immediately.
+
+3. If best candidate found: call Ancestry Record (AS) using source_url (preferred over bare record_id). Gets canonical full-name children list. ALWAYS do this step.
+
+4. Return ONLY this JSON:
+{
+  "found": true/false,
+  "record_id": "...",
+  "source_url": "...",
+  "person_name": "...",
+  "dob": "...",
+  "dod": "...",
+  "death_location": "...",
+  "children": ["FIRST LAST"],
+  "obit_text": "...full text if available...",
+  "confidence": "high|medium|low",
+  "notes": "Brief selection rationale."
+}"""
+
+ancestry_selector_agent = agent_node(
+    "Ancestry Selector Agent", NID["Ancestry Selector Agent"],
+    system_msg=ANCESTRY_SELECTOR_PROMPT,
+    text_expr=(
+        '={{ `Select best Ancestry obituary match.\n\n'
+        'First Name: ${$fromAI("first_name")}\n'
+        'Last Name: ${$fromAI("last_name")}\n'
+        'Death Year: ${$fromAI("death_year", "", "string", "")}\n'
+        'Death Location: ${$fromAI("death_location", "", "string", "")}\n'
+        'Session ID: ${$fromAI("session_id")}\n'
+        'Property ID: ${$fromAI("property_id")}` }}'
+    ),
+    max_iter=10,
+)
+ancestry_selector_model = gpt_model("GPT-5-Mini (Ancestry Selector)", NID["Ancestry Selector Model"])
+
+ancestry_search_save_as = http_tool(
+    "Ancestry Search Save (AS)", NID["Ancestry Search Save (AS)"],
+    (
+        "Search Ancestry AND auto-save results to DB. "
+        "Pass session_id, property_id, first_name, last_name, death_year, death_location, collection_id."
+    ),
+    f"{BASE}/ancestry/search-and-save",
+    (
+        '={{ { '
+        '"session_id": $fromAI("session_id", "Session ID"), '
+        '"property_id": $fromAI("property_id", "Property ID"), '
+        '"first_name": $fromAI("first_name", "First name", "string", ""), '
+        '"last_name": $fromAI("last_name", "Last name", "string", ""), '
+        '"birth_year": $fromAI("birth_year", "Birth year", "string", ""), '
+        '"death_year": $fromAI("death_year", "Death year", "string", ""), '
+        '"death_location": $fromAI("death_location", "Death location", "string", ""), '
+        '"collection_id": $fromAI("collection_id", "Collection ID", "string", "61843"), '
+        '"state": $fromAI("state", "State", "string", "NC") '
+        '} }}'
+    ),
+)
+
+ancestry_record_as = http_tool(
+    "Ancestry Record (AS)", NID["Ancestry Record (AS)"],
+    (
+        "Fetch a specific Ancestry record's full detail page AND save it. "
+        "Use source_url (preferred) or record_id. Returns canonical full-name children list."
+    ),
+    f"{BASE}/ancestry/record-and-save",
+    (
+        '={{ { '
+        '"session_id": $fromAI("session_id", "Session ID"), '
+        '"property_id": $fromAI("property_id", "Property ID"), '
+        '"record_id": $fromAI("record_id", "source_url preferred, or numeric record_id"), '
+        '"state": $fromAI("state", "State", "string", "NC") '
+        '} }}'
+    ),
+)
+
+# ── SkipGenie Resolver Agent (AI tool connected to Orchestrator) ───────────────
+
+SKIPGENIE_RESOLVER_PROMPT = """You are the SkipGenie Identity Resolver. Find and confirm the identity of ONE person using SkipGenie and write the result to the database.
+
+## Input (from parent agent)
+first_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name (as queued)
+
+## Steps
+
+1. Call SkipGenie (SR) with ALL provided address fields: first_name, last_name, street_address, city, zip_code, state. The property address is the best geographic anchor — family members typically lived nearby.
+
+2. Select the best match:
+   - Prefer: deceased=true if expected deceased
+   - Prefer: address closest to the property address
+   - Prefer: possible_relatives contains known family names
+   - If no convincing match: matched=false
+
+3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status="unknown", research_phase="skipgenie", matched_identity.
+
+4. Return ONLY this JSON:
+{
+  "matched": true/false,
+  "subject_name": "...",
+  "age": "...",
+  "dob": "...",
+  "dod": "...",
+  "deceased": true/false,
+  "last_address": "...",
+  "city": "...",
+  "state": "...",
+  "possible_relatives": [{"name": "...", "age": "...", "pid": "..."}],
+  "pid": "...",
+  "notes": "Brief match rationale."
+}"""
+
+skipgenie_resolver_agent = agent_node(
+    "SkipGenie Resolver Agent", NID["SkipGenie Resolver Agent"],
+    system_msg=SKIPGENIE_RESOLVER_PROMPT,
+    text_expr=(
+        '={{ `Resolve identity for person.\n\n'
+        'First Name: ${$fromAI("first_name")}\n'
+        'Last Name: ${$fromAI("last_name")}\n'
+        'Street Address: ${$fromAI("street_address", "", "string", "")}\n'
+        'City: ${$fromAI("city", "", "string", "")}\n'
+        'Zip: ${$fromAI("zip_code", "", "string", "")}\n'
+        'State: ${$fromAI("state", "", "string", "NC")}\n'
+        'Session ID: ${$fromAI("session_id")}\n'
+        'Property ID: ${$fromAI("property_id")}\n'
+        'Person Name: ${$fromAI("person_name")}` }}'
+    ),
+    max_iter=8,
+)
+skipgenie_resolver_model = gpt_model("GPT-5-Mini (SkipGenie Resolver)", NID["SkipGenie Resolver Model"])
+
+sg_sr = http_tool(
+    "SkipGenie (SR)", NID["SkipGenie (SR)"],
+    (
+        "Search SkipGenie for a person. PAID — only call once. "
+        "Pass first_name, last_name, street_address, city, zip_code, state."
+    ),
+    f"{BASE}/skipgenie",
+    (
+        '={{ { '
+        '"first_name": $fromAI("first_name", "First name"), '
+        '"last_name": $fromAI("last_name", "Last name"), '
+        '"middle_name": $fromAI("middle_name", "Middle name if known", "string", ""), '
+        '"street_address": $fromAI("street_address", "Street address", "string", ""), '
+        '"state": $fromAI("state", "State", "string", "NC"), '
+        '"city": $fromAI("city", "City", "string", ""), '
+        '"zip_code": $fromAI("zip_code", "ZIP code", "string", "") '
+        '} }}'
+    ),
+)
+
+write_person_sr = http_tool(
+    "Write Person (SR)", NID["Write Person (SR)"],
+    (
+        "Create or update a person record in DB. Call immediately after SkipGenie with matched_identity. "
+        "Required: session_id, property_id, input_name, vital_status."
+    ),
+    f"{BASE}/heir/upsert-person",
+    """={{ {
+  "session_id":        $fromAI("session_id", "Session ID"),
+  "property_id":       $fromAI("property_id", "Property ID"),
+  "input_name":        $fromAI("input_name", "Person name as queued"),
+  "vital_status":      $fromAI("vital_status", "living|deceased|unknown"),
+  "research_phase":    $fromAI("research_phase", "skipgenie|vital_status|complete", "string", "skipgenie"),
+  "matched_identity":  $fromAI("matched_identity", "SkipGenie matched identity", "json", {}),
+  "notes":             $fromAI("notes", "Notes", "string", "")
+} }}""",
+)
+
 # ── Orchestrator queue management ─────────────────────────────────────────────
 
 mark_person_done_orch = http_request(
@@ -1106,8 +1298,14 @@ all_nodes = [
     load_prop_state_orch, load_person_orch, load_anc_orch, load_court_orch, load_voter_orch,
     # DB write tools
     write_person_orch, write_voter_orch, queue_persons_orch,
-    # Sub-agent tool
+    # Sub-agent tools
     court_researcher_tool,
+    # Ancestry Selector Agent (AI tool)
+    ancestry_selector_agent, ancestry_selector_model,
+    ancestry_search_save_as, ancestry_record_as,
+    # SkipGenie Resolver Agent (AI tool)
+    skipgenie_resolver_agent, skipgenie_resolver_model,
+    sg_sr, write_person_sr,
     # Queue management
     mark_person_done_orch, check_queue_status_orch,
     if_queue_empty_orch, self_trigger_orch, trigger_family_assembly,
@@ -1186,8 +1384,18 @@ connections = {
     "Write Person (Orch)":           {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     "Write Voter Record (Orch)":     {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     "Queue Persons (Orch)":          {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
-    # Sub-agent tool → agent
+    # Sub-agent tools → orchestrator
     "Court Researcher Tool":         {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "Ancestry Selector Agent":       {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "SkipGenie Resolver Agent":      {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    # Ancestry Selector internal
+    "GPT-5-Mini (Ancestry Selector)": {"ai_languageModel": [[ai_lang("Ancestry Selector Agent")]]},
+    "Ancestry Search Save (AS)":     {"ai_tool": [[ai_tool("Ancestry Selector Agent")]]},
+    "Ancestry Record (AS)":          {"ai_tool": [[ai_tool("Ancestry Selector Agent")]]},
+    # SkipGenie Resolver internal
+    "GPT-5-Mini (SkipGenie Resolver)": {"ai_languageModel": [[ai_lang("SkipGenie Resolver Agent")]]},
+    "SkipGenie (SR)":                {"ai_tool": [[ai_tool("SkipGenie Resolver Agent")]]},
+    "Write Person (SR)":             {"ai_tool": [[ai_tool("SkipGenie Resolver Agent")]]},
     # Orchestrator → Mark Done → Check Queue → If Empty
     "Heir Research Orchestrator":   {"main": [[main("Mark Person Done (Orch)")]]},
     "Mark Person Done (Orch)":      {"main": [[main("Check Queue Status (Orch)")]]},
@@ -1288,6 +1496,17 @@ POS: dict[str, list[int]] = {
     "Write Voter Record (Orch)":    [520,  2000],
     "Queue Persons (Orch)":         [520,  2180],
     "Court Researcher Tool":        [520,  2360],
+    # AI sub-agent tools (col 4: x=740)
+    "Ancestry Selector Agent":      [740,  1820],
+    "SkipGenie Resolver Agent":     [740,  2000],
+    # Ancestry Selector internals
+    "GPT-5-Mini (Ancestry Selector)": [1000, 1820],
+    "Ancestry Search Save (AS)":    [960,  2000],
+    "Ancestry Record (AS)":         [960,  2180],
+    # SkipGenie Resolver internals
+    "GPT-5-Mini (SkipGenie Resolver)": [1000, 2360],
+    "SkipGenie (SR)":               [960,  2540],
+    "Write Person (SR)":            [960,  2720],
 
     # ── Workflow 3: Court Researcher main flow (y=3600) ──────────────────────
     "Court Researcher Webhook":     [0,    3600],
