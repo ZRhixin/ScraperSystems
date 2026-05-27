@@ -1264,7 +1264,6 @@ return_court_result = {
     "typeVersion": 1.1,
     "position": [0, 0],
     "parameters": {
-        "respondWith": "lastEntryJson",
         "options": {},
     },
 }
