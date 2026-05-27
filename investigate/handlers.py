@@ -84,7 +84,15 @@ def property_state(data: dict) -> tuple[int, dict]:
             "SELECT * FROM document_extractions WHERE property_id = %s ORDER BY id",
             (property_id,),
         )
-        extractions = _rows_to_dicts(cur.fetchall())
+        raw_extractions = _rows_to_dicts(cur.fetchall())
+        # Deduplicate by (book, page) — keep the first (lowest id) occurrence of each pair
+        _seen_bp = set()
+        extractions = []
+        for ex in raw_extractions:
+            key = (ex.get("book"), ex.get("page"))
+            if key not in _seen_bp:
+                _seen_bp.add(key)
+                extractions.append(ex)
 
         cur.execute(
             "SELECT * FROM investigation_sessions WHERE property_id = %s ORDER BY id DESC LIMIT 1",
