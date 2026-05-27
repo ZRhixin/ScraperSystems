@@ -517,7 +517,7 @@ One invocation = one person. New persons discovered (children from an obit, bene
    - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], done permanently.
 
 **Obituary research (only if no probate found with named persons):**
-7. Call Ancestry Selector Agent (AI tool) — pass first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. It handles full search + NC candidate selection + Ancestry Record detail internally. Returns {found, children[], obit_text, confidence}. Use this INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context.
+7. Call Ancestry Selector Agent (AI tool) — pass first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. Also pass any available context: maiden_name (birth surname if person married), known_relatives (comma-separated names of known family members from voter/court data), root_dob_year (birth year of root decedent — for generation gap validation), root_relationship (e.g. "child", "sibling"), property_city, known_spouse. The agent scores all candidates using evidence overlap — name match, parent names, relative overlap, address, spouse — and returns the single best match. Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, notes}. Use this INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context.
 8. Only fall back to Ancestry Search Save (Orch) directly if Ancestry Selector returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843).
 9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: "[FULL NAME] obituary [county] NC [year]".
 10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.
@@ -875,23 +875,48 @@ court_researcher_tool = http_tool(
 
 # ── Ancestry Selector Agent (AI tool connected to Orchestrator) ───────────────
 
-ANCESTRY_SELECTOR_PROMPT = """You are the Ancestry Selector. Search Ancestry for ONE person's obituary, select the best NC match, fetch the full record detail, and return a structured result.
+ANCESTRY_SELECTOR_PROMPT = """You are the Ancestry Selector. Search Ancestry for ONE person's obituary, score every candidate against known family context, and return the best-evidenced NC match.
 
 ## Input (from parent agent)
-first_name, last_name, death_year, death_location (e.g. "Wake, North Carolina"), session_id, property_id
+first_name, last_name, death_year, death_location, session_id, property_id
+Optional context (use when provided):
+- maiden_name — birth surname if the person married (e.g. "Hayes")
+- known_relatives — list of already-researched family members (names + relationships)
+- root_dob_year — birth year of the root decedent (e.g. 1892 for Lydia Hayes)
+- root_relationship — this person's relationship to the root (e.g. "child", "grandchild")
+- property_city — city of the property (e.g. "Wake Forest")
+- known_spouse — spouse name if known from SkipGenie or prior research
 
 ## Steps
 
 1. Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id="61843", session_id, property_id. Results auto-save to DB.
 
-2. Review ALL returned records_summary entries:
-   - STEP A — Hard reject: any record whose death_location contains a US state other than "North Carolina" or "NC" is disqualifying.
-   - STEP B — Among NC records, prefer: (1) dod year matches death_year ±2; (2) children[] overlap with known relatives; (3) dob plausible for expected age. Reject records with dod before 1960.
-   - STEP C — If no NC record passes, return found=false immediately.
+2. **Score every returned record** using the evidence matrix below. Do NOT hard-reject on name alone — married women change last names. Score each candidate, pick the highest scorer.
 
-3. If best candidate found: call Ancestry Record (AS) using source_url (preferred over bare record_id). Gets canonical full-name children list. ALWAYS do this step.
+### Hard Rejects (eliminate immediately, no score):
+- death_location contains a US state other than North Carolina / NC → reject
+- dod before 1960 → reject
+- Generation impossible: if root_dob_year is provided and root_relationship="child", the candidate's dob must be at least 15 years after root_dob_year. If dob gap is < 15 years, the candidate is the same generation as the root — reject. Example: root born 1892, searching for a child → candidate must be born 1907 or later.
 
-4. Return ONLY this JSON:
+### Scoring signals (award points, pick highest total):
+| Signal | Points |
+|---|---|
+| First name matches (case-insensitive) | +4 |
+| Last name matches OR maiden_name matches (e.g. "nee Hayes" in record) | +3 |
+| death_location is Wake County / Wake Forest NC | +3 |
+| Parent listed in record matches root decedent name (e.g. "Lydia Hayes") | +5 |
+| Sibling or child in record matches a known_relative name | +3 per match |
+| dod year within ±2 of death_year | +2 |
+| dob plausible for expected generation (child born ~20-40 yrs after root) | +2 |
+| Church or funeral home matches root decedent's known church/location | +2 |
+| known_spouse name appears in record | +3 |
+| First name does NOT match and maiden_name does NOT match | -3 |
+
+3. **Minimum threshold:** A candidate must score ≥ 4 points to be selected. If no candidate reaches 4, return `{"found": false}` immediately — do NOT guess, do NOT pick the "closest" name. A null result is always better than a wrong match. Low confidence (score 1–3) is not a reason to return something — it is a reason to return nothing.
+
+4. If best candidate found: call Ancestry Record (AS) using source_url (preferred over bare record_id). Gets canonical full-name children list with married surnames. ALWAYS do this step.
+
+5. Return ONLY this JSON:
 {
   "found": true/false,
   "record_id": "...",
@@ -903,7 +928,8 @@ first_name, last_name, death_year, death_location (e.g. "Wake, North Carolina"),
   "children": ["FIRST LAST"],
   "obit_text": "...full text if available...",
   "confidence": "high|medium|low",
-  "notes": "Brief selection rationale."
+  "score": <integer points>,
+  "notes": "List each signal that scored points and why this record was selected over others."
 }"""
 
 ancestry_selector_agent = agent_tool_node(
@@ -911,9 +937,10 @@ ancestry_selector_agent = agent_tool_node(
     tool_description=(
         "Search Ancestry for a person's obituary and return the single best NC match. "
         "Handles full search + NC candidate selection + Ancestry Record detail internally. "
-        "Returns {found, person_name, dob, dod, death_location, children[], obit_text, confidence}. "
+        "Returns {found, person_name, dob, dod, death_location, children[], obit_text, confidence, score, notes}. "
         "Use INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context. "
-        "Pass: first_name, last_name, death_year, death_location (e.g. 'Wake, North Carolina'), session_id, property_id."
+        "Pass: first_name, last_name, death_year, death_location, session_id, property_id. "
+        "Also pass when known: maiden_name, known_relatives (comma-separated), root_dob_year, root_relationship (e.g. 'decedent'), property_city, known_spouse."
     ),
     system_msg=ANCESTRY_SELECTOR_PROMPT,
     text_expr=(
@@ -923,7 +950,13 @@ ancestry_selector_agent = agent_tool_node(
         'Death Year: ${$fromAI("death_year", "Estimated death year", "string", "")}\n'
         'Death Location: ${$fromAI("death_location", "e.g. Wake, North Carolina", "string", "")}\n'
         'Session ID: ${$fromAI("session_id", "Session ID")}\n'
-        'Property ID: ${$fromAI("property_id", "Property ID")}` }}'
+        'Property ID: ${$fromAI("property_id", "Property ID")}\n'
+        'Maiden Name: ${$fromAI("maiden_name", "Birth surname if person married", "string", "")}\n'
+        'Known Relatives: ${$fromAI("known_relatives", "Comma-separated names of known relatives", "string", "")}\n'
+        'Root DOB Year: ${$fromAI("root_dob_year", "Birth year of root decedent for generation gap check", "string", "")}\n'
+        'Root Relationship: ${$fromAI("root_relationship", "Relationship to root decedent e.g. child sibling", "string", "")}\n'
+        'Property City: ${$fromAI("property_city", "City where property is located", "string", "")}\n'
+        'Known Spouse: ${$fromAI("known_spouse", "Name of known spouse if any", "string", "")}` }}'
     ),
     max_iter=10,
 )
