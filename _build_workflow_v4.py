@@ -1128,7 +1128,7 @@ court_researcher_webhook = {
     "parameters": {
         "httpMethod": "POST",
         "path": "heir-court-researcher",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {},
     },
     "webhookId": str(uuid.uuid5(uuid.NAMESPACE_URL, "heir-court-researcher-webhook-v4")),

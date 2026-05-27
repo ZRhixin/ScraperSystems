@@ -1121,7 +1121,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "heir-court-researcher",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "webhookId": "ace7f1ad-2f57-5066-b003-36ff04417b9a"
@@ -2094,7 +2094,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "943e2237-da9e-4621-9de3-4ede2d6a61c8",
+  "versionId": "da7c27b6-69b4-4529-ac3d-ee8160e8cc91",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },
