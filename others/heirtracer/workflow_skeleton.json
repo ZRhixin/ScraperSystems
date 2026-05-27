@@ -1,4 +1,4 @@
-{
+﻿{
   "nodes": [
     {
       "parameters": {
@@ -39,7 +39,7 @@
       "parameters": {
         "toolDescription": "Search for a person by name and location using SkipGenie. Returns a list of possible matches, each with: age, date of birth, date of death, deceased status, addresses, phone numbers, emails, possible relatives, and possible associates. Use this first before any other research on a person. Pass as much identifying information as you have — at minimum first name, last name, and state.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "https://scraper.trustedheirsolutions.com/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n    \"first_name\": \"{{ $fromAI('first_name', 'First name of the person to search') }}\",\n    \"last_name\": \"{{ $fromAI('last_name', 'Last name of the person to search') }}\",\n    \"middle_name\": \"{{ $fromAI('middle_name', 'Middle name if known, leave blank if unknown') }}\",\n    \"state\": \"{{ $fromAI('state', 'Two-letter state code, e.g. NC') }}\",\n    \"city\": \"{{ $fromAI('city', 'City of last known address if known, leave blank if unknown') }}\",\n    \"street_address\": \"{{ $fromAI('street_address', 'Street address if known, leave blank if unknown') }}\"\n}",
@@ -58,7 +58,7 @@
       "parameters": {
         "toolDescription": "Loads the full property record, session, transfer history, and existing extractions from the database.\nCall this before calling Title Attorney. Pass the returned data in the Title Attorney call.\nInput: { property_id }\nOutput: { property, session, appraiser_transfer_history, extractions }",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/investigate/property-state",
+        "url": "https://scraper.trustedheirsolutions.com/investigate/property-state",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"property_id\": $fromAI(\"property_id\", \"The property ID to load state for\") } }}",
@@ -102,7 +102,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/session",
+        "url": "https://scraper.trustedheirsolutions.com/heir/session",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{\n(function() {\n  try {\n    const raw = $('Root Owner Research').first().json.output || '';\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/{[\\s\\S]*}/);\n    const parsed = JSON.parse(match ? match[0] : cleaned);\n    const name =\n      (parsed.matched_person && parsed.matched_person.name) ||\n      (parsed.candidates_identified && parsed.candidates_identified[0] && parsed.candidates_identified[0].name) ||\n      'Unknown';\n    return {\n      property_id: $('Webhook').first().json.body.property_id,\n      root_decedent_name: name\n    };\n  } catch(e) {\n    return {\n      property_id: $('Webhook').first().json.body.property_id,\n      root_decedent_name: 'Unknown'\n    };\n  }\n})()\n}}",
@@ -120,7 +120,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "url": "https://scraper.trustedheirsolutions.com/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (function() {\n  try {\n    const raw = $('Root Owner Research').first().json.output || '';\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/{[\\s\\S]*}/);\n    const parsed = JSON.parse(match ? match[0] : cleaned);\n    const relatives = parsed.relatives || [];\n    const session = $('Create Heir Session').first().json;\n    return {\n      session_id: session.session_id,\n      property_id: session.property_id,\n      persons: relatives\n        .map(r => ({ name: (r.name || '').trim(), relationship_hint: r.relationship_hint || '' }))\n        .filter(r => r.name.length >= 3)\n    };\n  } catch(e) {\n    const session = $('Create Heir Session').first().json;\n    return { session_id: session.session_id, property_id: session.property_id, persons: [] };\n  }\n})() }}",
@@ -189,7 +189,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/next-person",
+        "url": "https://scraper.trustedheirsolutions.com/heir/next-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $json.body.session_id } }}",
@@ -269,7 +269,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/investigate/property-state",
+        "url": "https://scraper.trustedheirsolutions.com/investigate/property-state",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"property_id\": $('Orch - Prep').first().json.property_id } }}",
@@ -317,7 +317,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/persons",
+        "url": "https://scraper.trustedheirsolutions.com/heir/persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $('Orch - Prep').first().json.session_id } }}",
@@ -398,7 +398,7 @@
         19744
       ],
       "id": "f8644e8e-ac95-43a3-a062-31a53c265c34",
-      "name": "Parse Selection",
+      "name": "Parse Surname Crosser",
       "continueOnFail": true
     },
     {
@@ -406,7 +406,7 @@
         "promptType": "define",
         "text": "=Search for an obituary for this person:\n\nFull Name: {{ $json.matched_identity && $json.matched_identity.full_name ? $json.matched_identity.full_name : $json.name }}\nBirth year: {{ $json.matched_identity && $json.matched_identity.dob || 'unknown' }}\nSkipGenie death year: {{ $json.matched_identity && $json.matched_identity.dod || 'unknown' }}\nCounty: {{ $json.county || 'NC' }}\nSkipGenie deceased flag: {{ $json.skipgenie_deceased }}\n\nKNOWN RELATIVES (from SkipGenie possible_relatives — use to verify obituary matches this exact person):\n{{ JSON.stringify(($json.cascade_relatives || []).slice(0, 12).map(r => r.name || r)) }}\n\nPERSONS ALREADY RESEARCHED THIS SESSION (confirmed relatives — their names may appear as survivors in the obituary):\n{{ JSON.stringify(($json.session_persons || []).slice(0, 20).map(p => ({ name: p.matched_full_name || p.input_name, relationship: p.relationship_hint || '', status: p.vital_status || '' })).filter(p => p.name)) }}\n\nPROPERTY & OWNERSHIP CONTEXT (deed holders and owners are strong identity signals):\n{{ JSON.stringify($json.property_context) }}",
         "options": {
-          "systemMessage": "You are a standalone Obituary Researcher. Find the obituary for the given person and extract key death facts. You also search Ancestry.com for genealogy records.\n\nCONTEXT YOU HAVE: Known relatives (from SkipGenie), persons already researched in this session, and property ownership context (deed holders, current owners, transfer history). Use ALL of these as identity verification signals.\n\nSTEP 1 — BRAVE SEARCH\nRun searches in this order — stop as soon as you have a usable result:\n1. \"[Full Name] obituary [county] NC site:tributearchive.com OR site:findagrave.com OR site:dignitymemorial.com OR site:forevermissed.com\"\n2. \"[Full Name] obituary [city] NC\" (general — may return legacy.com, funeral homes, newspapers)\n3. \"[Full Name] obituary North Carolina [approximate death year if known]\"\nStop after 2 searches maximum. Never repeat the same query.\n\nIMPORTANT — legacy.com is BLOCKED by Cloudflare and cannot be fetched. If only legacy.com results appear:\n  → Read the Brave Search SNIPPET carefully — it often contains the death date and first few survivor names directly.\n  → Extract what you can from the snippet text alone.\n  → Do NOT waste a tool call trying to fetch a legacy.com URL.\n\nSTEP 2 — EXTRACT FROM SNIPPETS FIRST\nBefore fetching any URL, read the search snippets. If the snippet contains the death date and survivor names, you may not need to fetch the page at all.\n\nSTEP 3 — FETCH (skip legacy.com)\nIf a non-legacy.com obituary URL is found, IMMEDIATELY call Fetch Obituary Page with that URL. Do NOT search again using the URL — fetch it directly.\n\nSTEP 4 — ANCESTRY SEARCH (always run this)\nALWAYS call Ancestry Search for this person — regardless of whether you found an obituary.\nUse: first_name, last_name, birth_year from SkipGenie dob (year only, e.g. \"1942\"), state=\"NC\".\nIf birth_year is unknown or \"Unavailable\", omit it.\n\nAncestry is especially valuable for:\n- SSDI (Social Security Death Index) — authoritative deceased confirmation + exact DOD\n- NC Death Certificates — confirms DOD, county of death, spouse at time of death\n- Census records (1930/1940) — shows household members = family structure evidence\n- Ancestry obituary index — may find obits Brave Search missed\n\nAfter reviewing results, identify records that match this person (same name, plausible era, NC connection).\nThen call Write Ancestry Findings with:\n  - session_id, property_id, search_name (full name searched)\n  - search_first, search_last, search_birth_year, search_state\n  - records[] array of matching hits, each with:\n      record_id, record_type, person_name, dob, dod, spouse_name,\n      parents (array), children (array), source_url,\n      relevance (\"confirmed\" | \"likely\" | \"possible\"),\n      relevance_notes (one sentence explaining why it matches)\nSkip records that clearly don't match (wrong state, wrong era, wrong person).\nIf zero Ancestry records match, still call Write Ancestry Findings with an empty records[] so the session is marked as searched.\n\nSTEP 5 — VERIFY OBITUARY IDENTITY — HARD GATE\nA name match alone is NEVER sufficient. You must pass BOTH checks below.\n\nNAME SIMILARITY CHECK:\n  ACCEPTABLE: \"John Hayes\" → \"John Hayes\", \"John R. Hayes\", \"John Hayes Sr.\"\n  NOT ACCEPTABLE: \"John Hayes\" → \"John Wesley Hayes Jr.\" — the middle name \"Wesley\" and suffix \"Jr.\" indicate a DIFFERENT individual unless the SkipGenie subject_name also contains \"Wesley\" or \"Jr.\"\n  Rule: If the obituary deceased has a middle name OR Jr/Sr/III suffix that does NOT appear in either the search name or the SkipGenie subject_name → this is a NAME DISCREPANCY.\n\nRELATIVE OVERLAP CHECK:\n  Extract every name mentioned in the obituary (survived by, preceded in death by, son/daughter of, brother/sister of).\n  Compare against the KNOWN RELATIVES list (SkipGenie possible_relatives) and PERSONS ALREADY RESEARCHED THIS SESSION.\n  Partial match counts: same last name + matching first initial is sufficient.\n\nDECISION RULES (apply in order):\n  - No name discrepancy AND ≥1 relative overlaps → confidence: \"high\"\n  - No name discrepancy AND 0 overlaps AND uncommon surname → confidence: \"medium\"\n  - No name discrepancy AND 0 overlaps AND common surname (Hayes, Smith, Johnson, Williams, Davis, etc.) → confidence: \"low\" — return it but flag the gap\n  - NAME DISCREPANCY AND ≥2 relative overlaps → confidence: \"medium\" — relatives confirm identity despite name mismatch\n  - NAME DISCREPANCY AND ≤1 relative overlap → REJECT — return all empty fields, confidence: \"low\", note: \"rejected: name discrepancy with insufficient relative overlap\"\n  - Obituary is clearly a different person (wrong state, wrong generation, zero family overlap) → REJECT — return empty\n\nNEVER accept an obituary where the name has unrecognized extra components AND you cannot find at least 2 relatives in common.\n\nSTEP 6 — EXTRACT AND RETURN\nFrom the fetched page or search snippets, extract:\n- is_deceased: true if confirmed (obituary found OR Ancestry SSDI/death cert found), false if clearly alive, null if unknown\n- date_of_death: exact date or year from obituary OR Ancestry death record — prefer obituary if both found\n- marital_status_at_death: infer from survivors — spouse listed as surviving → \"married\"; preceded in death by spouse → \"widowed\"\n- surviving_spouse: name if listed, else \"\"\n- survivors: array of survivor names from obituary\n- obituary_url: full URL of the obituary page\n- obituary_text: the FULL obituary text as fetched — include all paragraphs covering survivors, preceded-in-death names, and any \"son of / daughter of / father of / mother of\" language. Do not summarize or truncate. This is stored in the database for the Family Assembler to read later.\n\nReturn ONLY raw JSON:\n{\n  \"is_deceased\": null,\n  \"date_of_death\": \"\",\n  \"death_location\": \"\",\n  \"marital_status_at_death\": \"\",\n  \"surviving_spouse\": \"\",\n  \"survivors\": [],\n  \"obituary_url\": \"\",\n  \"obituary_text\": \"\",\n  \"confidence\": \"high|medium|low\",\n  \"source\": \"\"\n}\n\nIf no obituary found after 2 searches, OR if the only matches were rejected by Step 5:\n  → Do NOT error or return plain text. Return this exact JSON structure with a clear notes field:\n  {\n    \"is_deceased\": null,\n    \"date_of_death\": \"\",\n    \"death_location\": \"\",\n    \"marital_status_at_death\": \"\",\n    \"surviving_spouse\": \"\",\n    \"survivors\": [],\n    \"obituary_url\": \"\",\n    \"obituary_text\": \"\",\n    \"confidence\": \"low\",\n    \"source\": \"\",\n    \"notes\": \"No obituary found\"\n  }\n  If a match was rejected in Step 5, set notes to: \"Obituary rejected: name discrepancy with insufficient relative overlap\"\n  NOTE: Even with no obituary, Ancestry records may still confirm is_deceased=true if SSDI or death certificate was found — use that.\nNEVER exceed 6 total tool calls (searches + fetch + ancestry search + write combined).\nNEVER throw an error or return non-JSON — always return the JSON structure above.",
+          "systemMessage": "You are a standalone Obituary Researcher. Find the obituary for the given person and extract key death facts. You also search Ancestry.com for genealogy records.\n\nCONTEXT YOU HAVE: Known relatives (from SkipGenie), persons already researched in this session, and property ownership context (deed holders, current owners, transfer history). Use ALL of these as identity verification signals.\n\nSTEP 1 — BRAVE SEARCH\nRun searches in this order — stop as soon as you have a usable result:\n1. \"[Full Name] obituary [county] NC site:tributearchive.com OR site:dignitymemorial.com OR site:forevermissed.com\"\n2. \"[Full Name] obituary [city] NC\" (general — may return legacy.com, funeral homes, newspapers)\n3. \"[Full Name] obituary North Carolina [approximate death year if known]\"\nStop after 2 searches maximum. Never repeat the same query.\n\nIMPORTANT — legacy.com is BLOCKED by Cloudflare and cannot be fetched. If only legacy.com results appear:\n  → Read the Brave Search SNIPPET carefully — it often contains the death date and first few survivor names directly.\n  → Extract what you can from the snippet text alone.\n  → Do NOT waste a tool call trying to fetch a legacy.com URL.\n\nSTEP 2 — EXTRACT FROM SNIPPETS FIRST\nBefore fetching any URL, read the search snippets. If the snippet contains the death date and survivor names, you may not need to fetch the page at all.\n\nSTEP 3 — FETCH (skip legacy.com)\nIf a non-legacy.com obituary URL is found, IMMEDIATELY call Fetch Obituary Page with that URL. Do NOT search again using the URL — fetch it directly.\n\nSTEP 4 — ANCESTRY SEARCH (always run this)\nALWAYS call Ancestry Search for this person — regardless of whether you found an obituary.\nUse: first_name, last_name, birth_year from SkipGenie dob (year only, e.g. \"1942\"), state=\"NC\".\nIf birth_year is unknown or \"Unavailable\", omit it.\n\nAncestry is especially valuable for:\n- SSDI (Social Security Death Index) — authoritative deceased confirmation + exact DOD\n- NC Death Certificates — confirms DOD, county of death, spouse at time of death\n- Census records (1930/1940) — shows household members = family structure evidence\n- Ancestry obituary index — may find obits Brave Search missed\n\nAfter reviewing results, identify records that match this person (same name, plausible era, NC connection).\nWhile reviewing matched records, collect the children[] array from each confirmed/likely record — you will include these in your output as ancestry_children.\nThen call Write Ancestry Findings with:\n  - session_id, property_id, search_name (full name searched)\n  - search_first, search_last, search_birth_year, search_state\n  - records[] array of matching hits, each with:\n      record_id, record_type, person_name, dob, dod, spouse_name,\n      parents (array), children (array), source_url,\n      relevance (\"confirmed\" | \"likely\" | \"possible\"),\n      relevance_notes (one sentence explaining why it matches)\nSkip records that clearly don't match (wrong state, wrong era, wrong person).\nIf zero Ancestry records match, still call Write Ancestry Findings with an empty records[] so the session is marked as searched.\n\nSTEP 5 — VERIFY OBITUARY IDENTITY — HARD GATE\nA name match alone is NEVER sufficient. You must pass BOTH checks below.\n\nNAME SIMILARITY CHECK:\n  ACCEPTABLE: \"John Hayes\" → \"John Hayes\", \"John R. Hayes\", \"John Hayes Sr.\"\n  NOT ACCEPTABLE: \"John Hayes\" → \"John Wesley Hayes Jr.\" — the middle name \"Wesley\" and suffix \"Jr.\" indicate a DIFFERENT individual unless the SkipGenie subject_name also contains \"Wesley\" or \"Jr.\"\n  Rule: If the obituary deceased has a middle name OR Jr/Sr/III suffix that does NOT appear in either the search name or the SkipGenie subject_name → this is a NAME DISCREPANCY.\n\nRELATIVE OVERLAP CHECK:\n  Extract every name mentioned in the obituary (survived by, preceded in death by, son/daughter of, brother/sister of).\n  Compare against the KNOWN RELATIVES list (SkipGenie possible_relatives) and PERSONS ALREADY RESEARCHED THIS SESSION.\n  Partial match counts: same last name + matching first initial is sufficient.\n\nDECISION RULES (apply in order):\n  - No name discrepancy AND ≥1 relative overlaps → confidence: \"high\"\n  - No name discrepancy AND 0 overlaps AND uncommon surname → confidence: \"medium\"\n  - No name discrepancy AND 0 overlaps AND common surname (Hayes, Smith, Johnson, Williams, Davis, etc.) → confidence: \"low\" — return it but flag the gap\n  - NAME DISCREPANCY AND ≥2 relative overlaps → confidence: \"medium\" — relatives confirm identity despite name mismatch\n  - NAME DISCREPANCY AND ≤1 relative overlap → REJECT — return all empty fields, confidence: \"low\", note: \"rejected: name discrepancy with insufficient relative overlap\"\n  - Obituary is clearly a different person (wrong state, wrong generation, zero family overlap) → REJECT — return empty\n\nNEVER accept an obituary where the name has unrecognized extra components AND you cannot find at least 2 relatives in common.\n\nSTEP 6 — EXTRACT AND RETURN\nFrom the fetched page or search snippets, extract:\n- is_deceased: true if confirmed (obituary found OR Ancestry SSDI/death cert found), false if clearly alive, null if unknown\n- date_of_death: exact date or year from obituary OR Ancestry death record — prefer obituary if both found\n- marital_status_at_death: infer from survivors — spouse listed as surviving → \"married\"; preceded in death by spouse → \"widowed\"\n- surviving_spouse: name if listed, else \"\"\n- survivors: structured array from obituary — each entry: {\"name\": \"Mary Hayes Justice\", \"relationship\": \"daughter\", \"location\": \"Wake Forest NC\", \"maiden_name\": \"HAYES\"}. Derive relationship from obituary language (\"survived by her daughter...\", \"his son...\"). If relationship not stated, use \"survivor\". For female survivors with a surname different from the deceased, infer maiden_name if context allows (e.g., \"daughter Mary Hayes Justice\" → maiden_name: \"HAYES\").\n- ancestry_children: array of children from confirmed/likely Ancestry records — each entry: {\"name\": \"...\", \"relationship\": \"child\"}. Only include children from records with relevance confirmed or likely.\n- obituary_url: full URL of the obituary page\n- obituary_text: the FULL obituary text as fetched — include all paragraphs covering survivors, preceded-in-death names, and any \"son of / daughter of / father of / mother of\" language. Do not summarize or truncate. This is stored in the database for the Family Assembler to read later.\n\nReturn ONLY raw JSON:\n{\n  \"is_deceased\": null,\n  \"date_of_death\": \"\",\n  \"death_location\": \"\",\n  \"marital_status_at_death\": \"\",\n  \"surviving_spouse\": \"\",\n  \"survivors\": [],\n  \"ancestry_children\": [],\n  \"maiden_name\": \"\",\n  \"obituary_url\": \"\",\n  \"obituary_text\": \"\",\n  \"confidence\": \"high|medium|low\",\n  \"source\": \"\"\n}\n\nIf no obituary found after 2 searches, OR if the only matches were rejected by Step 5:\n  → Do NOT error or return plain text. Return this exact JSON structure with a clear notes field:\n  {\n    \"is_deceased\": null,\n    \"date_of_death\": \"\",\n    \"death_location\": \"\",\n    \"marital_status_at_death\": \"\",\n    \"surviving_spouse\": \"\",\n    \"survivors\": [],\n    \"ancestry_children\": [],\n    \"maiden_name\": \"\",\n    \"obituary_url\": \"\",\n    \"obituary_text\": \"\",\n    \"confidence\": \"low\",\n    \"source\": \"\",\n    \"notes\": \"No obituary found\"\n  }\n  If a match was rejected in Step 5, set notes to: \"Obituary rejected: name discrepancy with insufficient relative overlap\"\n  NOTE: Even with no obituary, Ancestry records may still confirm is_deceased=true if SSDI or death certificate was found — use that.\n\nSTEP 4b — MAIDEN NAME / MARRIAGE RECORDS\nIf the person is female (first name is female, or relationship_hint includes \"wife\", \"daughter\", \"mother\", \"sister\"):\n  a. Scan any fetched obituary text for maiden name clues: \"née [Surname]\", \"born [First] [Surname]\", \"formerly [Surname]\", \"daughter of [Father] and [Mother]\".\n     If found, set maiden_name in your output.\n  b. If the person has a surname DIFFERENT from the property owner's surname (e.g., researching CARRIE WILKERSON where property is HAYES family), she is likely a married heir.\n     Her birth surname is probably HAYES. Search Ancestry using birth surname:\n       Call Ancestry Search with: first_name = Carrie, last_name = HAYES, state = NC, name_x = \"0_1\"\n     Look for marriage records linking her birth name to her married name. Confirm if any record shows a CARRIE HAYES who married a WILKERSON.\n  c. When extracting survivors from obituaries, note each female survivor's likely maiden surname if context suggests it:\n     \"survived by her daughter Mary Hayes Justice\" → maiden_name for Mary = HAYES.\n     Include this in the survivors array: {\"name\": \"Mary Hayes Justice\", \"relationship\": \"daughter\", \"maiden_name\": \"HAYES\"}.\n\n\nSTEP 4d — NC VOTER LOOKUP (for uncertain or living persons)\nIf vital status is unknown, or if you need to find a person's current address/married name:\n  Call NC Voter Lookup with: last_name, first_name, county (use \"Wake\" for Wake County properties).\n  Active registration = strong signal person is living.\n  Removed/Inactive = may be deceased or moved.\n  IMPORTANT: If searching for a woman and her maiden surname is known (e.g., HAYES), also search by maiden surname — she may be registered under a married name you don't yet know.\n  The registered name field will show her current legal (married) name.\n\nNEVER exceed 9 total tool calls (searches + fetch + ancestry + voter + write combined).\nNEVER throw an error or return non-JSON — always return the JSON structure above.",
           "maxIterations": 8
         }
       },
@@ -447,7 +447,7 @@
       "parameters": {
         "toolDescription": "Fetch the full text content of an obituary web page. Call this immediately after finding an obituary URL in Brave Search results — pass the URL and get back the full page text. Use this instead of searching again with the URL. Returns plain text extracted from the page.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/fetch-page",
+        "url": "https://scraper.trustedheirsolutions.com/fetch-page",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"The full obituary page URL to fetch, e.g. https://www.wagesfuneralhome.com/obituaries/Tracy-M-Hayes?obId=38043249\"), \"max_chars\": 8000 } }}",
@@ -504,7 +504,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ (function() {\n  const p = $('Parse Selection').first().json;\n  const personName = (p.matched_identity && p.matched_identity.full_name) ? p.matched_identity.full_name : p.name;\n  return 'Check deed and court records for this relative.\\n\\nPerson Name: ' + personName + '\\nProperty ID: ' + p.property_id + '\\nCounty: ' + (p.county || 'wake') + '\\nParcel ID: ' + (p.parcel_id || '') + '\\nRelationship Hint: ' + (p.relationship_hint || '') + '\\n\\nRun deed check and court check, return JSON findings.';\n})() }}",
+        "text": "={{ (function() {\n  const p = $('Parse Surname Crosser').first().json;\n  const personName = (p.matched_identity && p.matched_identity.full_name) ? p.matched_identity.full_name : p.name;\n  return 'Check deed and court records for this relative.\\n\\nPerson Name: ' + personName + '\\nProperty ID: ' + p.property_id + '\\nCounty: ' + (p.county || 'wake') + '\\nParcel ID: ' + (p.parcel_id || '') + '\\nRelationship Hint: ' + (p.relationship_hint || '') + '\\n\\nRun deed check and court check, return JSON findings.';\n})() }}",
         "options": {
           "systemMessage": "You are a standalone heir-tracer deed and court researcher.\nYou MUST call the deed search tool AND Court Search before returning any response.\nReturning JSON without calling tools is a failure — always call both.\n\n## NAME PARSING\nSplit the person name: surname = last word uppercased (\"HAYES\"), first_name = everything before uppercased (\"TRACY M\").\nUse these when calling deed search tools.\n\n## TASK 1 — DEED CHECK\nSearch deed records for this person as GRANTOR.\nPick tool by county:\n  \"wake\"        → Wake Deeds  (search_type=\"name\", role=\"grantor\")\n  \"buncombe\"    → Buncombe Deeds\n  \"mecklenburg\" → Mecklenburg Deeds\n  other county  → skip deed search, set county_supported=false\n\n## TASK 2 — COURT CHECK\nCall Court Search with the name and county.\nLook for case type \"E\" (Estate) or \"SP\" (Special Proceedings).\nIf a relevant case is found, optionally call Register of Actions for the event timeline.\n\n### Register of Actions caveat\nIf roa_unavailable=true, do NOT retry — use Court Search results directly:\n  estate_filed = true if any case has category=\"Estate\" or case_type_code=\"SP\" or \"E\"\n  had_will = null\n\n## OUTPUT — raw JSON only, no markdown fences\n{\n  \"deed_check\": {\n    \"found_as_grantor\": false,\n    \"county_supported\": true,\n    \"transfers\": []\n  },\n  \"court_check\": {\n    \"estate_filed\": null,\n    \"had_will\": null,\n    \"cases\": []\n  },\n  \"notes\": \"\"\n}\n\nEach transfer: { book, page, doc_type, grantee, recording_date }.\nEach case: { case_number, case_type, filing_date, parties, case_url }.\nestate_filed: true if found, false if no cases, null if search could not run.\nhad_will: true=testate, false=intestate, null=unknown.",
           "maxIterations": 30
@@ -523,7 +523,7 @@
       "parameters": {
         "toolDescription": "### Wake Deeds\n```\nSearch Wake County Register of Deeds by name or document number.\nUse for name searches — NOT for pulling a deed by book/page.\n\nFor name search:\n  { \"search_type\": \"name\", \"surname\": \"HAYES\", \"first_name\": \"LYDIA\", \"role\": \"grantee\" }\n  role options: grantor | grantee | both\n\nFor document number search:\n  { \"search_type\": \"document\", \"document_number\": \"004714-00624\" }\n\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/county/wake/deeds",
+        "url": "https://scraper.trustedheirsolutions.com/county/wake/deeds",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"search_type\": \"{{ $fromAI('search_type', 'name | document') }}\",\n  \"surname\": \"{{ $fromAI('surname', 'Last name for name search') }}\",\n  \"first_name\": \"{{ $fromAI('first_name', 'First name for name search') }}\",\n  \"role\": \"{{ $fromAI('role', 'grantor | grantee | both') }}\",\n  \"document_number\": \"{{ $fromAI('document_number', 'Document number for document search example 004714-00624') }}\"\n}",
@@ -543,7 +543,7 @@
       "parameters": {
         "toolDescription": "### Buncombe Deeds\n```\nSearch Buncombe County Register of Deeds.\nUse when county is \"buncombe\".\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/county/buncombe/deeds",
+        "url": "https://scraper.trustedheirsolutions.com/county/buncombe/deeds",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{\n  {\n    search_type: $fromAI(\"search_type\", \"name | document\"),\n    surname: $fromAI(\"surname\", \"Last name for name search\"),\n    first_name: $fromAI(\"first_name\", \"First name for name search\"),\n    role: $fromAI(\"role\", \"grantor | grantee | both\"),\n    document_number: $fromAI(\"document_number\", \"Document number for document search\")\n  }\n}}",
@@ -562,7 +562,7 @@
       "parameters": {
         "toolDescription": "### Mecklenburg Deeds\n```\nSearch Mecklenburg County Register of Deeds.\nUse when county is \"mecklenburg\".\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/county/mecklenburg/deeds",
+        "url": "https://scraper.trustedheirsolutions.com/county/mecklenburg/deeds",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{\n  search_type: $fromAI(\"search_type\", \"name | document\"),\n  surname: $fromAI(\"surname\", \"Last name for name search\"),\n  first_name: $fromAI(\"first_name\", \"First name for name search\"),\n  role: $fromAI(\"role\", \"grantor | grantee | both\"),\n  document_number: $fromAI(\"document_number\", \"Document number for document search\")\n}}",
@@ -581,7 +581,7 @@
       "parameters": {
         "toolDescription": "### Court Search\n```\nSearch NC Clerk of Superior Court by party name.\nUse when the Title Attorney needs to find estate, probate, foreclosure, or judgment cases\nfor a specific person or entity.\nRequired: name (full name or last name). Optional: county.\nInput: { name: \"HAYES\" | \"HAYES, LYDIA\", county?: \"Wake\" }\nReturns: list of cases with case_number, case_type, filing_date, parties, case_url.\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/search",
+        "url": "https://scraper.trustedheirsolutions.com/court/nc/search",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -610,7 +610,7 @@
       "parameters": {
         "toolDescription": "### Register of Actions\n```\nGet the full event timeline for a specific court case.\nCall after Court Search when you need to inspect a case in detail.\nReturns the foreclosure stage and all case events with dates and descriptions.\nRequired: case_url (from Court Search results).\nInput: { case_url: \"...\" }\n```",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/court/nc/register_of_actions",
+        "url": "https://scraper.trustedheirsolutions.com/court/nc/register_of_actions",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"case_url\": \"{{ $fromAI('case_url', 'URL of the court case from Court Search results') }}\"\n}",
@@ -654,7 +654,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Source nodes\nconst orch = $('Parse Selection').first().json;\nconst obit = $('Parse Obituary Output').first().json;\n\n// Parse Title Attorney raw agent output\nconst taRaw = ($input.first().json.output || '').replace(/```json\\n?/g, '').replace(/```/g, '').trim();\nlet ta = {};\ntry {\n  ta = JSON.parse(taRaw);\n} catch(_) {\n  const s = taRaw.indexOf('{');\n  const e = taRaw.lastIndexOf('}');\n  if (s !== -1 && e > s) {\n    try { ta = JSON.parse(taRaw.slice(s, e + 1)); } catch(_) {}\n  }\n}\n\n// Resolve vital status — obituary is ground truth, SkipGenie is fallback\nlet vital_status = 'unknown';\nif (obit.is_deceased === true)        vital_status = 'deceased';\nelse if (obit.is_deceased === false)  vital_status = 'living';\nelse if (orch.skipgenie_deceased === true)  vital_status = 'deceased';\nelse if (orch.skipgenie_deceased === false) vital_status = 'living';\n\nconst deedCheck  = ta.deed_check  || {};\nconst courtCheck = ta.court_check || {};\nconst estFiled   = courtCheck.estate_filed !== undefined ? courtCheck.estate_filed : null;\nconst hadWill    = courtCheck.had_will    !== undefined ? courtCheck.had_will    : null;\n\n// A deceased person without a confirmed estate filing needs cascade\nconst cascade_needed = vital_status === 'deceased' && estFiled !== true;\n\nconst identity = orch.matched_identity || {};\n\nreturn [{ json: {\n  name:              orch.name || '',\n  property_id:       orch.property_id,\n  session_id:        orch.session_id,\n  queue_id:          orch.queue_id,\n  loop_context:      orch.loop_context || 'worker',\n  relationship_hint: orch.relationship_hint || '',\n  age:               orch.age || '',\n  phone:             orch.phone || '',\n  address:           orch.address || '',\n  county:            orch.county || '',\n  parcel_id:         orch.parcel_id || '',\n  matched_identity:  identity,\n  cascade_relatives: orch.cascade_relatives || [],\n  vital_status,\n  deceased_facts: {\n    date_of_death:           obit.date_of_death           || '',\n    marital_status_at_death: obit.marital_status_at_death || '',\n    surviving_spouse_name:   obit.surviving_spouse        || '',\n    estate_filed:            estFiled,\n    had_will:                hadWill,\n    family_alive_at_death:   obit.survivors               || [],\n  },\n  deed_transfers:  deedCheck.transfers || [],\n  cascade_needed,\n  obituary_url:    obit.obituary_url  || '',\n  obituary_text:   obit.obituary_text || '',\n  claim_sources: {\n    date_of_death: {\n      value:      obit.date_of_death || '',\n      source:     obit.obituary_url ? 'obituary' : (identity.dod ? 'skipgenie' : 'unknown'),\n      url:        obit.obituary_url || '',\n      confidence: obit.date_of_death ? (obit.confidence || 'medium') : 'none',\n    },\n    marital_status_at_death: {\n      value:      obit.marital_status_at_death || '',\n      source:     obit.marital_status_at_death ? 'obituary' : 'unknown',\n      confidence: obit.marital_status_at_death ? 'medium' : 'none',\n    },\n    estate_filed: {\n      value:        estFiled,\n      source:       estFiled !== null ? 'nc_courts' : 'unknown',\n      case_numbers: (courtCheck.cases || []).map(c => c.case_number).filter(Boolean),\n      confidence:   estFiled !== null ? 'high' : 'low',\n    },\n    had_will: {\n      value:      hadWill,\n      source:     hadWill !== null ? 'register_of_actions' : 'unknown',\n      confidence: hadWill !== null ? 'medium' : 'none',\n    },\n    family_alive_at_death: {\n      sources:    (obit.survivors || []).length ? ['obituary'] : [],\n      confidence: (obit.survivors || []).length ? (obit.confidence || 'medium') : 'none',\n    },\n  },\n  skipgenie_deceased: orch.skipgenie_deceased,\n  notes: [orch.notes ? 'Orch: ' + orch.notes : '', ta.notes ? 'TA: ' + ta.notes : ''].filter(Boolean).join(' | '),\n} }];"
+        "jsCode": "// Source nodes\nconst orch = $('Parse Surname Crosser').first().json;\nconst obit = $('Parse Obituary Output').first().json;\n\n// Parse Title Attorney raw agent output\nconst taRaw = ($input.first().json.output || '').replace(/```json\\n?/g, '').replace(/```/g, '').trim();\nlet ta = {};\ntry {\n  ta = JSON.parse(taRaw);\n} catch(_) {\n  const s = taRaw.indexOf('{');\n  const e = taRaw.lastIndexOf('}');\n  if (s !== -1 && e > s) {\n    try { ta = JSON.parse(taRaw.slice(s, e + 1)); } catch(_) {}\n  }\n}\n\n// Resolve vital status — obituary is ground truth, SkipGenie is fallback\nlet vital_status = 'unknown';\nif (obit.is_deceased === true)             vital_status = 'deceased';\nelse if (obit.is_deceased === false)       vital_status = 'living';\nelse if (orch.skipgenie_deceased === true)  vital_status = 'deceased';\nelse if (orch.skipgenie_deceased === false) vital_status = 'living';\n\nconst deedCheck  = ta.deed_check  || {};\nconst courtCheck = ta.court_check || {};\nconst estFiled   = courtCheck.estate_filed !== undefined ? courtCheck.estate_filed : null;\nconst hadWill    = courtCheck.had_will     !== undefined ? courtCheck.had_will     : null;\n\nconst cascade_needed = vital_status === 'deceased' && estFiled !== true;\nconst identity = orch.matched_identity || {};\n\n// ---------------------------------------------------------------------------\n// Build cascade_relatives — merge all genealogical sources\n// Priority: obituary survivors (confirmed obit) > ancestry children > skipgenie\n// ---------------------------------------------------------------------------\n\nfunction normName(n) {\n  return (n || '').toUpperCase().replace(/[^A-Z ]/g, '').trim().replace(/\\s+/g, ' ');\n}\n\nconst JUNK = [/^HEIRS OF/i, /^HEIR OF/i, /^ESTATE OF/i, /^ESTATE$/i,\n              /^UNKNOWN$/i, /^N\\/A$/i, /^NA$/i, /^NONE$/i, /^NULL$/i];\nfunction isJunk(name) {\n  if (!name || name.trim().length < 3) return true;\n  if (/^\\d+$/.test(name.trim())) return true;\n  return JUNK.some(p => p.test(name.trim()));\n}\n\nconst seen = new Set();\nconst cascade_relatives = [];\n\nfunction addRelative(name, relationship, source) {\n  if (isJunk(name)) return;\n  const key = normName(name);\n  if (!key || seen.has(key)) return;\n  seen.add(key);\n  const item = { name: name.trim(), relationship: relationship || 'unknown', source };\n  cascade_relatives.push(item);\n  return item;\n}\n\n// 1. Obituary survivors — ONLY when obit was accepted (confidence high or medium)\nconst obitConfidence = obit.confidence || obit.obit_confidence || '';\nif (obitConfidence === 'high' || obitConfidence === 'medium') {\n  for (const s of (obit.survivors || [])) {\n    if (typeof s === 'string') {\n      addRelative(s, 'survivor', 'obituary');\n    } else if (s && s.name) {\n      const rel = addRelative(s.name, s.relationship || 'survivor', 'obituary');\n      if (rel && s.maiden_name) rel.maiden_name = s.maiden_name;\n    }\n  }\n}\n\n// 2. Ancestry children — agent already filtered by relevance\nfor (const c of (obit.ancestry_children || [])) {\n  if (typeof c === 'string') {\n    addRelative(c, 'child', 'ancestry');\n  } else if (c && c.name) {\n    addRelative(c.name, c.relationship || 'child', 'ancestry');\n  }\n}\n\n// 3. SkipGenie possible_relatives — fill remaining gaps only\nfor (const r of (orch.cascade_relatives || [])) {\n  if (typeof r === 'string') {\n    addRelative(r, 'unknown', 'skipgenie');\n  } else if (r && r.name) {\n    addRelative(r.name, r.relationship || 'unknown', 'skipgenie');\n  }\n}\n\nreturn [{ json: {\n  name:              orch.name || '',\n  property_id:       orch.property_id,\n  session_id:        orch.session_id,\n  queue_id:          orch.queue_id,\n  loop_context:      orch.loop_context || 'worker',\n  relationship_hint: orch.relationship_hint || '',\n  age:               orch.age || '',\n  phone:             orch.phone || '',\n  address:           orch.address || '',\n  county:            orch.county || '',\n  parcel_id:         orch.parcel_id || '',\n  matched_identity:  identity,\n  cascade_relatives,\n  vital_status,\n  deceased_facts: {\n    date_of_death:           obit.date_of_death           || '',\n    marital_status_at_death: obit.marital_status_at_death || '',\n    surviving_spouse_name:   obit.surviving_spouse        || '',\n    estate_filed:            estFiled,\n    had_will:                hadWill,\n    family_alive_at_death:   obit.survivors               || [],\n  },\n  deed_transfers:  deedCheck.transfers || [],\n  cascade_needed,\n  obituary_url:    obit.obituary_url  || '',\n  obituary_text:   obit.obituary_text || '',\n  claim_sources: {\n    date_of_death: {\n      value:      obit.date_of_death || '',\n      source:     obit.obituary_url ? 'obituary' : (identity.dod ? 'skipgenie' : 'unknown'),\n      url:        obit.obituary_url || '',\n      confidence: obit.date_of_death ? (obit.confidence || 'medium') : 'none',\n    },\n    marital_status_at_death: {\n      value:      obit.marital_status_at_death || '',\n      source:     obit.marital_status_at_death ? 'obituary' : 'unknown',\n      confidence: obit.marital_status_at_death ? 'medium' : 'none',\n    },\n    estate_filed: {\n      value:        estFiled,\n      source:       estFiled !== null ? 'nc_courts' : 'unknown',\n      case_numbers: (courtCheck.cases || []).map(c => c.case_number).filter(Boolean),\n      confidence:   estFiled !== null ? 'high' : 'low',\n    },\n    had_will: {\n      value:      hadWill,\n      source:     hadWill !== null ? 'register_of_actions' : 'unknown',\n      confidence: hadWill !== null ? 'medium' : 'none',\n    },\n    family_alive_at_death: {\n      sources:    (obit.survivors || []).length ? ['obituary'] : [],\n      confidence: (obit.survivors || []).length ? (obitConfidence || 'medium') : 'none',\n    },\n  },\n  maiden_name:        obit.maiden_name || '',\n  skipgenie_deceased: orch.skipgenie_deceased,\n  notes: [orch.notes ? 'Orch: ' + orch.notes : '', ta.notes ? 'TA: ' + ta.notes : ''].filter(Boolean).join(' | '),\n} }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -669,7 +669,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-person",
+        "url": "https://scraper.trustedheirsolutions.com/heir/write-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json }}",
@@ -687,7 +687,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "url": "https://scraper.trustedheirsolutions.com/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (function() {\n  const pc = $('Person Compiler').first().json;\n  if (!pc.cascade_needed) {\n    return { session_id: pc.session_id, property_id: pc.property_id, persons: [] };\n  }\n  const INVALID = ['HEIRS OF','HEIR OF','ESTATE OF','UNKNOWN','CHILDREN OF','DESCENDANTS OF'];\n  function isValidName(name) {\n    if (!name || name.length < 3) return false;\n    const u = name.toUpperCase();\n    if (INVALID.some(p => u.startsWith(p))) return false;\n    if (name.split(' ').filter(Boolean).length < 2) return false;\n    return true;\n  }\n  return {\n    session_id: pc.session_id,\n    property_id: pc.property_id,\n    persons: (pc.cascade_relatives || [])\n      .map(r => ({\n        name: (r.name || '').replace(/\\s*\\(.*?\\)/g, '').trim(),\n        relationship_hint: (r.relationship || 'cascade_heir').substring(0, 120)\n      }))\n      .filter(r => isValidName(r.name))\n  };\n})() }}",
@@ -706,7 +706,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/complete-person",
+        "url": "https://scraper.trustedheirsolutions.com/heir/complete-person",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"queue_id\": $('Worker - Prepare Item').first().json.queue_id } }}",
@@ -746,7 +746,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/queue-status",
+        "url": "https://scraper.trustedheirsolutions.com/heir/queue-status",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $('Worker Webhook').first().json.body.session_id } }}",
@@ -798,7 +798,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/claim-fa-trigger",
+        "url": "https://scraper.trustedheirsolutions.com/heir/claim-fa-trigger",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $('Worker Webhook').first().json.body.session_id } }}",
@@ -906,7 +906,7 @@
       "parameters": {
         "toolDescription": "Load all researched persons for this heir research session. Pass ONLY session_id (the integer session ID). DO NOT pass property_id — it returns contaminated cross-session data. The session_id is provided directly in your input. Just use that integer. Returns: session info (root_decedent_name, status), persons array with all research data.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/persons",
+        "url": "https://scraper.trustedheirsolutions.com/heir/persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The integer session ID from your input — use this exact number, do not substitute property_id\") } }}",
@@ -926,7 +926,7 @@
       "parameters": {
         "toolDescription": "Load the full obituary text saved in the database for one or all persons in this session. Use this to get rich relationship language (\"son of...\", \"father of...\", \"survived by...\", \"preceded in death by...\") that helps you map family relationships. Pass session_id to get all obituaries in the session, or person_id to get one specific person's obituary.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/obituary-text",
+        "url": "https://scraper.trustedheirsolutions.com/heir/obituary-text",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The session ID to load obituary texts for\") } }}",
@@ -1003,7 +1003,7 @@
       "parameters": {
         "toolDescription": "Check which candidate names have NOT yet been researched in this session. Call this before building cascade_persons to avoid re-researching people already in the session. Pass session_id and candidate_names (array of full name strings). Returns new_persons (names to cascade) and already_researched (names to skip).",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/filter-cascade",
+        "url": "https://scraper.trustedheirsolutions.com/heir/filter-cascade",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The heir research session ID\"), \"candidate_names\": $fromAI(\"candidate_names\", \"Array of full name strings to check — include every person who might need cascade\") } }}",
@@ -1102,7 +1102,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "url": "https://scraper.trustedheirsolutions.com/heir/queue-persons",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (function() {\n  const ip = $input.first().json;\n  const INVALID = ['HEIRS OF','HEIR OF','ESTATE OF','UNKNOWN','CHILDREN OF','DESCENDANTS OF'];\n  function isValidName(name) {\n    if (!name || name.length < 3) return false;\n    const u = name.toUpperCase();\n    if (INVALID.some(p => u.startsWith(p))) return false;\n    if (name.split(' ').filter(Boolean).length < 2) return false;\n    return true;\n  }\n  return {\n    session_id: ip.session_id,\n    property_id: ip.property_id,\n    persons: (ip.cascade_persons || [])\n      .map(p => ({\n        name: (p.name || '').replace(/\\s*\\(.*?\\)/g, '').trim(),\n        relationship_hint: (p.reason || 'cascade_heir').substring(0, 120)\n      }))\n      .filter(p => isValidName(p.name))\n  };\n})() }}",
@@ -1186,7 +1186,7 @@
       "parameters": {
         "toolDescription": "Write the final compiled heir tree to the database after Intestate Expert has determined all shares. Call once when all research is complete. Required fields: property_id, session_id, root_decedent_name, heir_tree (array of heirs with shares). Optional: intestate_analysis, living_heir_count, status, gaps.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write",
+        "url": "https://scraper.trustedheirsolutions.com/heir/write",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $fromAI(\"heir_tree_data\", \"Full heir tree object: { property_id, session_id, root_decedent_name, heir_tree, intestate_analysis, living_heir_count, status, gaps }\") }}",
@@ -1230,7 +1230,7 @@
       "parameters": {
         "toolDescription": "Search Ancestry.com for genealogy records. Pass as many signals as you have — more parameters = more precise results.\n\nREQUIRED: first_name and/or last_name.\n\nKEY PARAMETERS:\n- birth_year: from SkipGenie dob (year only, e.g. '1942'). When provided, search uses ±3 year range — tight and precise.\n- death_year: from SkipGenie dod or obituary.\n- death_location: 'North Carolina' — pins results to NC death records. Much stronger than state filter. Use whenever person is known NC resident.\n- birth_location: 'North Carolina' — for birth records.\n- gender: 'm' or 'f'. Derive from relationship_hint: son/husband/father/brother = 'm', daughter/wife/mother/sister = 'f'.\n- spouse: spouse name if known from SkipGenie or prior research.\n- father / mother: parent names if known (e.g. root decedent is the parent).\n- name_x: '1_1' exact first+last (default), '0_1' last name only (use when first name is uncertain or maiden name unknown).\n\nReturns up to 50 records with: record_type, collection, person_name, dob, dod, spouse_name, parents[], children[], death_location, source_url.\n\nAfter reviewing results, call Write Ancestry Findings to save relevant ones.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/search",
+        "url": "https://scraper.trustedheirsolutions.com/ancestry/search",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name. Empty string if unknown.\"), \"last_name\": $fromAI(\"last_name\", \"Last name / surname.\"), \"birth_year\": $fromAI(\"birth_year\", \"Birth year from SkipGenie dob, e.g. 1942. Empty string if unknown.\"), \"death_year\": $fromAI(\"death_year\", \"Death year if known. Empty string if unknown.\"), \"birth_location\": $fromAI(\"birth_location\", \"Birth state/location e.g. 'North Carolina'. Empty string if unknown.\"), \"death_location\": $fromAI(\"death_location\", \"Death state/location e.g. 'North Carolina'. Pass this whenever person is a known NC resident.\"), \"gender\": $fromAI(\"gender\", \"'m' or 'f'. Infer from relationship_hint: son/husband/father/brother=m, daughter/wife/mother/sister=f. Empty string if unknown.\"), \"spouse\": $fromAI(\"spouse\", \"Spouse name if known from SkipGenie or prior research. Empty string if unknown.\"), \"father\": $fromAI(\"father\", \"Father name if known. Empty string if unknown.\"), \"mother\": $fromAI(\"mother\", \"Mother name if known. Empty string if unknown.\"), \"name_x\": $fromAI(\"name_x\", \"Name matching: '1_1'=exact first+last (default), '0_1'=last name only (use when first name uncertain)\"), \"state\": $fromAI(\"state\", \"State abbreviation or name for residence filter. Default NC.\") } }}",
@@ -1250,7 +1250,7 @@
       "parameters": {
         "toolDescription": "Save relevant Ancestry.com records found for this person to the database. Call this after Ancestry Search once you have identified records that match (or likely match) the person. Pass session_id, property_id, search_name (the name you searched for), and a records[] array of the relevant hits. For each record include: record_id, record_type, person_name, dob, dod, spouse_name, parents, children, source_url, relevance (confirmed|likely|possible), and relevance_notes explaining why you chose it. Skip records that clearly do not match (wrong state, wrong era, wrong person).",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/write-ancestry",
+        "url": "https://scraper.trustedheirsolutions.com/heir/write-ancestry",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The session ID for this heir research run\"), \"property_id\": $fromAI(\"property_id\", \"The property ID\"), \"search_name\": $fromAI(\"search_name\", \"The full name that was searched\"), \"search_first\": $fromAI(\"search_first\", \"First name searched\"), \"search_last\": $fromAI(\"search_last\", \"Last name searched\"), \"search_birth_year\": $fromAI(\"search_birth_year\", \"Birth year used in search, or empty\"), \"search_state\": $fromAI(\"search_state\", \"State searched, default NC\"), \"records\": $fromAI(\"records\", \"Array of relevant Ancestry record objects to save\") } }}",
@@ -1270,7 +1270,7 @@
       "parameters": {
         "toolDescription": "Search Ancestry.com for genealogy records to fill relationship gaps. Use when obituary text is missing or vague. Pass as many signals as you have for precision.\n\nKEY PARAMETERS:\n- birth_year: from matched_dob in DB record (year only). Gives ±3 year range — tight search.\n- death_location: 'North Carolina' — pins to NC records, eliminates foreign noise.\n- gender: derive from relationship_hint.\n- spouse / father / mother: pass any known relative names as cross-reference signals.\n- name_x: '0_1' for last-name-only search when first name is uncertain.\n\nReturns structured spouse_name, parents[], children[] arrays from NC death certs, census records, and SSDI — cleaner than parsing free-text obituaries.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/ancestry/search",
+        "url": "https://scraper.trustedheirsolutions.com/ancestry/search",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name. Empty string if unknown.\"), \"last_name\": $fromAI(\"last_name\", \"Last name / surname.\"), \"birth_year\": $fromAI(\"birth_year\", \"Birth year from SkipGenie dob, e.g. 1942. Empty string if unknown.\"), \"death_year\": $fromAI(\"death_year\", \"Death year if known. Empty string if unknown.\"), \"birth_location\": $fromAI(\"birth_location\", \"Birth state/location e.g. 'North Carolina'. Empty string if unknown.\"), \"death_location\": $fromAI(\"death_location\", \"Death state/location e.g. 'North Carolina'. Pass this whenever person is a known NC resident.\"), \"gender\": $fromAI(\"gender\", \"'m' or 'f'. Infer from relationship_hint: son/husband/father/brother=m, daughter/wife/mother/sister=f. Empty string if unknown.\"), \"spouse\": $fromAI(\"spouse\", \"Spouse name if known from SkipGenie or prior research. Empty string if unknown.\"), \"father\": $fromAI(\"father\", \"Father name if known. Empty string if unknown.\"), \"mother\": $fromAI(\"mother\", \"Mother name if known. Empty string if unknown.\"), \"name_x\": $fromAI(\"name_x\", \"Name matching: '1_1'=exact first+last (default), '0_1'=last name only (use when first name uncertain)\"), \"state\": $fromAI(\"state\", \"State abbreviation or name for residence filter. Default NC.\") } }}",
@@ -1290,7 +1290,7 @@
       "parameters": {
         "toolDescription": "Load all Ancestry.com records saved by the Obituary Researcher for this session. These are pre-filtered, relevant records already judged by the Obituary Researcher. Use this alongside Load Obituary Texts to get structured family data (spouse_name, parents[], children[]) that supplements or fills gaps in obituary text. Pass session_id to get all records, or add relevance=confirmed to get only high-confidence matches.",
         "method": "POST",
-        "url": "http://127.0.0.1:8000/heir/ancestry-records",
+        "url": "https://scraper.trustedheirsolutions.com/heir/ancestry-records",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"The session ID to load ancestry records for\"), \"relevance\": $fromAI(\"relevance\", \"Optional filter: confirmed, likely, possible, or omit for all\") } }}",
@@ -1309,7 +1309,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "https://scraper.trustedheirsolutions.com/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[0].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[0].last_name, \"state\": $('Parse Attempts').first().json.attempts[0].state, \"city\": $('Parse Attempts').first().json.attempts[0].city } }}",
@@ -1327,7 +1327,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "https://scraper.trustedheirsolutions.com/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[1].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[1].last_name, \"state\": $('Parse Attempts').first().json.attempts[1].state, \"city\": $('Parse Attempts').first().json.attempts[1].city } }}",
@@ -1345,7 +1345,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "https://scraper.trustedheirsolutions.com/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[2].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[2].last_name, \"state\": $('Parse Attempts').first().json.attempts[2].state, \"city\": $('Parse Attempts').first().json.attempts[2].city } }}",
@@ -1363,7 +1363,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "https://scraper.trustedheirsolutions.com/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[3].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[3].last_name, \"state\": $('Parse Attempts').first().json.attempts[3].state, \"city\": $('Parse Attempts').first().json.attempts[3].city } }}",
@@ -1381,7 +1381,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8000/skipgenie",
+        "url": "https://scraper.trustedheirsolutions.com/skipgenie",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $('Parse Attempts').first().json.attempts[4].first_name, \"last_name\": $('Parse Attempts').first().json.attempts[4].last_name, \"state\": $('Parse Attempts').first().json.attempts[4].state, \"city\": $('Parse Attempts').first().json.attempts[4].city } }}",
@@ -1540,6 +1540,25 @@
       ],
       "id": "068dd184-88c2-47cc-a5ed-47cdd03e1dbe",
       "name": "Parse Attempts"
+    },
+    {
+      "id": "d74b94cb-c01c-44c1-9152-81edc234db46",
+      "name": "NC Voter Lookup",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        -19834,
+        20044
+      ],
+      "parameters": {
+        "toolDescription": "NC voter registration lookup. Returns: name (current legal/married name — key for finding married female heirs), county, city_state_zip, status (A=Active=living, R=Removed=possibly deceased), status_desc. Always search by maiden/family surname too to cross surname boundaries.",
+        "method": "POST",
+        "url": "https://scraper.trustedheirsolutions.com/voter/nc/lookup",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"last_name\": \"{{('last_name', 'Last name to search')}}\",\n  \"first_name\": \"{{('first_name', 'First name', 'string')}}\",\n  \"birth_year\": \"{{('birth_year', 'Birth year for identity confirmation — year only e.g. 1942', 'string')}}\",\n  \"county\": \"{{('county', 'NC county name e.g. Wake — leave blank for statewide', 'string')}}\",\n  \"include_removed\": {{('include_removed', 'true to include removed/denied registrations', 'boolean')}}\n}",
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -1752,7 +1771,7 @@
       "main": [
         [
           {
-            "node": "Parse Selection",
+            "node": "Parse Surname Crosser",
             "type": "main",
             "index": 0
           }
@@ -1770,7 +1789,7 @@
         ]
       ]
     },
-    "Parse Selection": {
+    "Parse Surname Crosser": {
       "main": [
         [
           {
@@ -2350,6 +2369,17 @@
           {
             "node": "SkipGenie Try 1",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NC Voter Lookup": {
+      "ai_tool": [
+        [
+          {
+            "node": "Obituary Researcher",
+            "type": "ai_tool",
             "index": 0
           }
         ]

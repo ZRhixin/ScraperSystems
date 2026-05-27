@@ -1,0 +1,74 @@
+﻿
+=== Worker - Prepare Item ===
+const wb = $('Worker Webhook').first().json.body;
+const item = $('Claim Next Person').first().json.item;
+return [{ json: {
+  name:              item.person_name,
+  relationship_hint: item.relationship_hint || '',
+  age:               '',
+  phone:             '',
+  address:           '',
+  property_id:       wb.property_id,
+  session_id:        wb.session_id,
+  queue_id:          item.queue_id,
+  loop_context:      'worker'
+} }];
+
+=== Orch - Prep ===
+const d = $input.first().json;
+const words = (d.name || '').trim().split(/\s+/).filter(Boolean);
+const last = words.length > 0 ? words[words.length - 1] : '';
+const rest = words.slice(0, -1);
+const firstFull = rest.join(' ');
+const firstOnly = rest[0] || '';
+const hasMiddle = rest.length > 1;
+const addrHint = (d.address || '').trim();
+let city = '', street = '';
+if (addrHint) {
+  const parts = addrHint.split(',').map(s => s.trim());
+  if (parts.length >= 3) { street = parts[0]; city = parts[parts.length - 2].replace(/\s+[A-Z]{2}\s*\d*$/, '').trim(); }
+  else if (parts.length === 2) { street = parts[0]; city = parts[1].replace(/\s+[A-Z]{2}\s*\d*$/, '').trim(); }
+}
+return [{ json: {
+  name: d.name || '',
+  property_id: d.property_id,
+  session_id: d.session_id,
+  loop_context: d.loop_context || 'worker',
+  relationship_hint: d.relationship_hint || '',
+  age: d.age || '',
+  phone: d.phone || '',
+  address: d.address || '',
+  queue_id: d.queue_id,
+  _last: last,
+  _first_full: firstFull,
+  _first_only: firstOnly,
+  _has_middle: hasMiddle,
+  _city: city,
+  _street: street,
+} }];
+
+=== Queue Cascade Relatives jsonBody ===
+={{ (function() {
+  const pc = $('Person Compiler').first().json;
+  if (!pc.cascade_needed) {
+    return { session_id: pc.session_id, property_id: pc.property_id, persons: [] };
+  }
+  const INVALID = ['HEIRS OF','HEIR OF','ESTATE OF','UNKNOWN','CHILDREN OF','DESCENDANTS OF'];
+  function isValidName(name) {
+    if (!name || name.length < 3) return false;
+    const u = name.toUpperCase();
+    if (INVALID.some(p => u.startsWith(p))) return false;
+    if (name.split(' ').filter(Boolean).length < 2) return false;
+    return true;
+  }
+  return {
+    session_id: pc.session_id,
+    property_id: pc.property_id,
+    persons: (pc.cascade_relatives || [])
+      .map(r => ({
+        name: (r.name || '').replace(/\s*\(.*?\)/g, '').trim(),
+        relationship_hint: (r.relationship || 'cascade_heir').substring(0, 120)
+      }))
+      .filter(r => isValidName(r.name))
+  };
+})() }}

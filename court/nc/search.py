@@ -25,6 +25,7 @@ Functions:
 """
 import json
 import re
+import threading
 import time
 
 from curl_cffi import requests as cffi_requests
@@ -36,6 +37,9 @@ _HOME = f"{BASE}/Portal/Home/Dashboard/29"
 _SEARCH_URL = f"{BASE}/Portal/SmartSearch/SmartSearch/SmartSearch"
 _RESULTS_URL = f"{BASE}/Portal/SmartSearch/SmartSearchResults"
 _ROA_API = f"{BASE}/app/api/cases"
+_SVC     = f"{BASE}/app/RegisterOfActionsService"
+
+_roa_lock = threading.Lock()
 
 _TAX_PLAINTIFFS = (
     "county of ", "city of ", "town of ", "municipality",
@@ -64,17 +68,50 @@ def _new_session() -> cffi_requests.Session:
 # Public entry points
 # ---------------------------------------------------------------------------
 
-def search_by_name(name: str, county: str = "") -> list[dict]:
+def _name_variants(name: str) -> list[str]:
     """
-    Search NC Courts Portal by party name.
+    Generate name variants for retrying court searches.
 
-    name: last name only ("HAYES") or "LAST, FIRST MIDDLE" format.
-    county: optional county filter, e.g. "Wake County". Empty = all locations.
-
-    Returns a list of matching parties, each with their cases.
+    The portal's behavior is finicky: "HAYES, ALYCE F" returns 0 hits but
+    "HAYES, ALYCE" returns 8 (incl. the estate case). To survive name drift
+    between SkipGenie/Ancestry sources and the court index, try several forms.
     """
-    court_location = f"{county} County" if county and not county.lower().endswith("county") else (county or "All Locations")
+    raw = (name or "").strip()
+    if not raw:
+        return []
 
+    variants: list[str] = [raw]
+    seen = {raw.upper()}
+
+    def _add(v: str) -> None:
+        v = " ".join(v.split())
+        if v and v.upper() not in seen:
+            variants.append(v)
+            seen.add(v.upper())
+
+    if "," in raw:
+        # "LAST, FIRST MIDDLE" → also try without middle, last-only, FIRST LAST
+        last, _, rest = raw.partition(",")
+        rest_parts = rest.strip().split()
+        if rest_parts:
+            first = rest_parts[0]
+            _add(f"{last.strip()}, {first}")          # drop middle
+            _add(f"{first} {last.strip()}")           # FIRST LAST
+        _add(last.strip())                            # LAST only
+    else:
+        parts = raw.split()
+        if len(parts) >= 2:
+            last = parts[-1]
+            first = parts[0]
+            _add(f"{last}, {' '.join(parts[:-1])}")   # LAST, FIRST [MIDDLE]
+            _add(f"{last}, {first}")                  # LAST, FIRST (drop middle)
+            _add(last)                                # LAST only
+
+    return variants[:4]  # cap at 4 attempts
+
+
+def _do_search(name: str, court_location: str) -> list[dict]:
+    """Issue a single SmartSearch POST/GET cycle. WAF-aware."""
     payload = {
         "Settings.CaptchaEnabled": "False",
         "Settings.CaptchaDisabledForAuthenticated": "False",
@@ -119,7 +156,6 @@ def search_by_name(name: str, county: str = "") -> list[dict]:
         if resp.status_code not in (200, 302):
             raise RuntimeError(f"SmartSearch POST returned {resp.status_code}: {resp.text[:300]}")
 
-        # Brief pause — server needs a moment to prepare results before the GET is ready
         time.sleep(2)
 
         ts = int(time.time() * 1000)
@@ -135,6 +171,180 @@ def search_by_name(name: str, county: str = "") -> list[dict]:
 
         return _parse_results(results_resp.text)
 
+    return []
+
+
+_ESTATE_CASE_TYPES = ("estate", "special proceeding")
+
+
+def _has_estate_hit(parties: list[dict]) -> bool:
+    for p in parties:
+        for c in (p.get("cases") or []):
+            ct = (c.get("case_type") or "").lower()
+            code = (c.get("case_type_code") or "").upper()
+            if code in ("E", "SP") or any(t in ct for t in _ESTATE_CASE_TYPES):
+                return True
+    return False
+
+
+def search_by_name(name: str, county: str = "") -> list[dict]:
+    """
+    Search NC Courts Portal by party name with multi-variant retry.
+
+    name: last name only ("HAYES") or "LAST, FIRST MIDDLE" format.
+    county: optional county filter, e.g. "Wake County". Empty = all locations.
+
+    If the first variant returns 0 parties or 0 estate-type cases, retries
+    with stripped middle initial / FIRST LAST / LAST-only formats and merges
+    results (dedup by case_number). Stops at the first variant that yields
+    any estate hit, or returns the union of all variants tried.
+    """
+    court_location = f"{county} County" if county and not county.lower().endswith("county") else (county or "All Locations")
+
+    variants = _name_variants(name)
+    if not variants:
+        return []
+
+    merged: list[dict] = []
+    seen_cases: set[str] = set()
+
+    for v in variants:
+        parties = _do_search(v, court_location)
+
+        if parties:
+            for p in parties:
+                kept_cases = []
+                for c in (p.get("cases") or []):
+                    cn = c.get("case_number")
+                    if cn and cn in seen_cases:
+                        continue
+                    if cn:
+                        seen_cases.add(cn)
+                    kept_cases.append(c)
+                if kept_cases:
+                    merged.append({**p, "cases": kept_cases})
+
+        # Stop early once we've found an estate case under any variant.
+        if _has_estate_hit(merged):
+            break
+
+    return merged
+
+
+def _normalize_case_event(evt: dict) -> dict:
+    """Normalize a CaseEvents API event (nested structure) to flat {date, event, party, comments}."""
+    inner   = evt.get("Event") or {}
+    type_id = inner.get("TypeId") or {}
+    return {
+        "date":     inner.get("FiledDate") or inner.get("EventDate") or inner.get("Date"),
+        "event":    type_id.get("Description") or inner.get("EventDescription"),
+        "party":    inner.get("PartyDescription"),
+        "comments": inner.get("Comments"),
+    }
+
+
+def _get_roa_via_playwright(case_url: str) -> list[dict]:
+    """
+    WAF fallback for get_register_of_actions.
+
+    The direct /app/api/cases/{id}/registerofactions endpoint sits behind a
+    separate ALB target group whose AWSALB sticky-session cookie is not
+    established by the /Portal/ SmartSearch warmup.
+
+    Instead: open a headless browser with saved WAF cookies, navigate to the
+    ROA React page, and call RegisterOfActionsService/CaseEvents from inside
+    the page's JS context (same technique used in pull_document.py).  The
+    browser's own session cookies are used for the fetch — WAF never fires.
+    """
+    from playwright.sync_api import sync_playwright
+
+    if not case_url.startswith("http"):
+        case_url = BASE + case_url
+
+    with _roa_lock:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
+            ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+
+            # Seed saved WAF + AWSALB cookies — avoid re-solving CAPTCHA
+            if _TOKEN_FILE.exists():
+                try:
+                    saved = json.loads(_TOKEN_FILE.read_text())
+                    for c in saved.get("cookies", []):
+                        try:
+                            ctx.add_cookies([{
+                                "name":   c["name"],
+                                "value":  c["value"],
+                                "domain": c.get("domain", ".tylertech.cloud"),
+                                "path":   c.get("path", "/"),
+                            }])
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            page = ctx.new_page()
+
+            # Extract LONG_ID — React router sets window.location.hash after mounting
+            long_id = None
+            m = re.search(r'#/([A-Fa-f0-9]{80,})', case_url)
+            if m:
+                long_id = m.group(1)
+
+            page.goto(case_url, wait_until="domcontentloaded", timeout=30000)
+
+            if not long_id:
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
+                time.sleep(2)
+                hash_val = page.evaluate(
+                    "() => window.location.hash.replace('#/', '').split('/')[0]"
+                )
+                if hash_val and len(hash_val) >= 80:
+                    long_id = hash_val
+
+            if not long_id:
+                print("[ROA] Could not determine LONG_ID from ROA page")
+                browser.close()
+                return []
+
+            events_url = (
+                f"{_SVC}/CaseEvents('{long_id}')"
+                f"?mode=portalembed&$top=200&$skip=0"
+            )
+            data = page.evaluate(
+                """async ([url]) => {
+                    try {
+                        const r = await fetch(url, {
+                            credentials: 'include',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (!r.ok) return { error: true, status: r.status };
+                        return await r.json();
+                    } catch (e) {
+                        return { error: true, msg: e.toString() };
+                    }
+                }""",
+                [events_url],
+            )
+            browser.close()
+
+            if isinstance(data, dict) and data.get("error"):
+                print(f"[ROA] CaseEvents API error: {data}")
+                return []
+
+            events = (data or {}).get("Events", [])
+            print(f"[ROA] Playwright fallback returned {len(events)} events")
+            return [_normalize_case_event(e) for e in events]
+
 
 def get_register_of_actions(case_url: str) -> list[dict]:
     """
@@ -143,15 +353,19 @@ def get_register_of_actions(case_url: str) -> list[dict]:
     case_url: the register_of_actions_url from search results.
               e.g. "/app/RegisterOfActions/?id=ABC123" or full URL.
     Returns a list of case events.
+
+    Falls back to a Playwright-based fetcher if the direct /app/api/ endpoint
+    is WAF-blocked (different ALB target group from /Portal/ SmartSearch).
     """
     if not case_url.startswith("http"):
         case_url = BASE + case_url
 
     match = re.search(r'[?&]id=([^&]+)', case_url)
     if not match:
-        raise ValueError(f"Cannot extract case id from URL: {case_url}")
-    encrypted_id = match.group(1)
+        # Hash-based or unknown URL format — go straight to Playwright
+        return _get_roa_via_playwright(case_url)
 
+    encrypted_id = match.group(1)
     api_url = f"{_ROA_API}/{encrypted_id}/registerofactions"
 
     for attempt in range(2):
@@ -169,20 +383,23 @@ def get_register_of_actions(case_url: str) -> list[dict]:
             if attempt == 0:
                 _invalidate_and_refresh()
                 continue
-            raise RuntimeError("Register of Actions blocked by WAF after token refresh — run: python -m court.nc.session")
+            print("[ROA] Direct API WAF-blocked after refresh — trying Playwright fallback")
+            return _get_roa_via_playwright(case_url)
 
         if resp.status_code == 404:
-            # Portal /app/ routes need a different WAF context than /Portal/ — API is inaccessible.
-            # Return empty events so callers can treat this as "no events found" rather than crashing.
-            return []
+            # /app/api/ sits behind a separate ALB target group — use Playwright fallback
+            print("[ROA] Direct API returned 404 — trying Playwright fallback")
+            return _get_roa_via_playwright(case_url)
 
         if resp.status_code != 200:
             raise RuntimeError(f"Register of Actions API returned {resp.status_code}")
-        break
 
-    data = resp.json()
-    events = data if isinstance(data, list) else (data.get("registerOfActions") or data.get("events") or [])
-    return [_normalize_event(e) for e in events]
+        data = resp.json()
+        events = data if isinstance(data, list) else (data.get("registerOfActions") or data.get("events") or [])
+        return [_normalize_event(e) for e in events]
+
+    # Loop exhausted without returning (both attempts WAF-blocked and refresh failed)
+    return _get_roa_via_playwright(case_url)
 
 
 # ---------------------------------------------------------------------------

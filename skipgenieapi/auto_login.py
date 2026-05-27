@@ -1,6 +1,6 @@
 """
 Automated SkipGenie login — pure HTTP, no browser.
-Uses 2captcha to solve reCAPTCHA v2, then POSTs credentials to the login API.
+Uses 2captcha to solve Cloudflare Turnstile, then POSTs credentials to the login API.
 """
 import asyncio
 import os
@@ -20,8 +20,8 @@ PASSWORD = os.getenv("SKIPGENIE_PASSWORD")
 API_KEY = os.getenv("TWOCAPTCHA_API_KEY")
 
 LOGIN_URL = "https://web.skipgenie.com/api/auth/login"
-RECAPTCHA_SITEKEY = "6LcLcC0qAAAAAEmq2GVhG6PXds23KHI0Ki0tB7jv"
-RECAPTCHA_PAGE_URL = "https://web.skipgenie.com/"
+TURNSTILE_SITEKEY = "0x4AAAAAADURsFaoK1MOayS5"
+TURNSTILE_PAGE_URL = "https://web.skipgenie.com/"
 
 _DEVICE_ID_FILE = sess.SESSION_FILE.parent / "device_id.txt"
 
@@ -34,12 +34,12 @@ def _get_device_id() -> str:
     return device_id
 
 
-def _solve_recaptcha() -> str:
+def _solve_turnstile() -> str:
     if not API_KEY:
         raise RuntimeError("TWOCAPTCHA_API_KEY not set in .env")
-    print("[*] Sending reCAPTCHA to 2captcha...")
+    print("[*] Sending Cloudflare Turnstile to 2captcha...")
     solver = TwoCaptcha(API_KEY)
-    result = solver.recaptcha(sitekey=RECAPTCHA_SITEKEY, url=RECAPTCHA_PAGE_URL)
+    result = solver.turnstile(sitekey=TURNSTILE_SITEKEY, url=TURNSTILE_PAGE_URL)
     token = result["code"]
     print(f"[*] Got token: {token[:30]}...")
     return token
@@ -50,7 +50,7 @@ def login() -> str | None:
     Solve reCAPTCHA and POST to login API.
     Returns the JWT token on success, None on failure.
     """
-    recaptcha_token = _solve_recaptcha()
+    recaptcha_token = _solve_turnstile()
     device_id = _get_device_id()
 
     payload = {
@@ -85,7 +85,7 @@ def login() -> str | None:
     body = resp.json()
 
     if body.get("status") != 1:
-        print(f"[!] Login failed: {body.get('message')}")
+        print(f"[!] Login failed: {body.get('message') or body.get('error') or body}")
         return None
 
     token = body["data"]["token"]

@@ -1,0 +1,12 @@
+﻿
+Obituary Deep Diver tools: ['Brave Search', 'Fetch Obituary Page', 'Ancestry Search', 'Write Ancestry Findings', 'NC Voter Lookup']
+
+Genealogist tools: ['Write Family Tree Database']
+
+Vital Status Researcher tools: ['NC Voter (VSR)', 'Ancestry Search (VSR)', 'Write Voter Record (VSR)']
+
+Surname Crosser tools: ['Ancestry Search (SCR)', 'NC Voter (SCR)', 'Write Voter Record (SCR)']
+
+Title Attorney tools: ['Wake Deeds', 'Buncombe Deeds', 'Mecklenburg Deeds', 'Court Search', 'Register of Actions', 'Court Document Pull']
+
+Recovery nodes: []

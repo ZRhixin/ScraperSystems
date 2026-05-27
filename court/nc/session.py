@@ -25,6 +25,7 @@ from curl_cffi import requests as cffi_requests
 
 _TOKEN_FILE = Path(__file__).parent / "session_cookies.json"
 _PORTAL_URL = "https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29"
+_APP_URL    = "https://portal-nc.tylertech.cloud/app/RegisterOfActions/"
 _TOKEN_MAX_AGE_HOURS = 48  # aws-waf-token is valid for days
 
 _UA = (
@@ -88,7 +89,7 @@ def refresh_waf_token(headless: bool = False) -> str:
         page = ctx.new_page()
         page.goto(_PORTAL_URL, timeout=60000)
 
-        deadline = time.time() + 90
+        deadline = time.time() + 600
         while time.time() < deadline:
             try:
                 title = page.title()
@@ -102,10 +103,20 @@ def refresh_waf_token(headless: bool = False) -> str:
         else:
             browser.close()
             raise TimeoutError(
-                "CAPTCHA was not solved within 90 seconds. "
+                "CAPTCHA was not solved within 10 minutes. "
                 "Run: python -m court.nc.session"
             )
 
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+        time.sleep(1)
+
+        # Also warm up /app/ routes — they sit behind a separate ALB target group
+        # and need their own AWSALB sticky session cookie.
+        print("[NC Courts] Warming up /app/ routes...")
+        page.goto(_APP_URL, wait_until="domcontentloaded", timeout=30000)
         try:
             page.wait_for_load_state("networkidle", timeout=10000)
         except Exception:
@@ -148,16 +159,25 @@ def build_session() -> cffi_requests.Session:
     s.headers["User-Agent"] = _UA
     s.cookies.set("aws-waf-token", token, domain=".tylertech.cloud")
 
-    # Warm up: hit the home page to create/renew the ASP.NET session.
-    # This is cheap (< 2s) and ensures the session is always fresh.
+    # Warm up /Portal/ to renew ASP.NET session, then /app/ for its AWSALB target group.
     resp = s.get(_PORTAL_URL, timeout=20)
     if "Human Verification" in resp.text:
-        # WAF token expired — force re-solve
+        # WAF token expired — force re-solve (will also warm up /app/ routes)
         if _TOKEN_FILE.exists():
             _TOKEN_FILE.unlink()
         token = refresh_waf_token(headless=False)
         s.cookies.set("aws-waf-token", token, domain=".tylertech.cloud")
         s.get(_PORTAL_URL, timeout=20)
+
+    # Load all saved cookies (includes AWSALB for /app/ target group from refresh)
+    if _TOKEN_FILE.exists():
+        try:
+            import json as _json
+            saved = _json.loads(_TOKEN_FILE.read_text())
+            for c in saved.get("cookies", []):
+                s.cookies.set(c["name"], c["value"], domain=c.get("domain", ".tylertech.cloud"))
+        except Exception:
+            pass
 
     return s
 

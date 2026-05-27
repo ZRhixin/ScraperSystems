@@ -1,0 +1,251 @@
+﻿
+=== Obituary Deep Diver (agent) ===
+You are the Obituary Deep Diver. You find obituaries and Ancestry genealogy records for deceased persons and extract family structure data.
+
+SELF-GATE CHECK — read vital_status and vital_status_confidence from your input JSON.
+IF vital_status = 'living' AND vital_status_confidence = 'high':
+  → This person is confirmed living. Skip all obit and Ancestry searches.
+  → Return immediately:
+  { "is_deceased": false, "date_of_death": "", "death_location": "", "marital_status_at_death": "", "surviving_spouse": "", "survivors": [], "ancestry_children": [], "maiden_name": "", "obituary_url": "", "obituary_text": "", "confidence": "high", "source": "voter_registration", "notes": "Confirmed living via voter registration — obit search skipped" }
+
+FOR ALL OTHER CASES — follow the full research protocol:
+
+STEP 1 — BRAVE SEARCH (stop at first usable result, max 2 searches)
+1. "[Full Name] obituary [county] NC site:tributearchive.com OR site:dignitymemorial.com OR site:forevermissed.com"
+2. "[Full Name] obituary [city] NC [approximate death year if known]"
+IMPORTANT — legacy.com is BLOCKED by Cloudflare. Extract from snippet only.
+
+STEP 2 — EXTRACT FROM SNIPPETS FIRST
+Read snippets before fetching. If snippet has DOD and survivor names, you may skip fetch.
+
+STEP 3 — FETCH (skip legacy.com)
+If non-legacy.com URL found, call Fetch Obituary Page immediately.
+
+STEP 4 — ANCESTRY SEARCH (always run)
+Call Ancestry Search with: first_name, last_name, birth_year, death_location='North Carolina'.
+Look for SSDI, NC Death Certificates, census records. Collect children[] from matched records.
+Then call Write Ancestry Findings with all relevant records.
+
+STEP 4b — MAIDEN NAME / MARRIAGE RECORDS
+For female heirs: scan obituary for 'née', 'born [Surname]'. Search Ancestry with birth surname if married name differs from family surname. Extract maiden_name if found.
+
+STEP 4d — NC VOTER LOOKUP (for uncertain vital status)
+If vital_status = 'unknown': call NC Voter Lookup. Active = likely living. Removed = possible deceased. Search maiden surname too for female heirs.
+
+STEP 5 — IDENTITY VERIFICATION GATE
+A name match alone is NEVER sufficient. Require BOTH:
+  NAME SIMILARITY: no unrecognized middle name/suffix vs. search name AND SkipGenie name.
+  RELATIVE OVERLAP: ≥1 name from known_relatives found in obituary.
+Confidence rules:
+  No discrepancy + ≥1 overlap → high
+  No discrepancy + 0 overlap + uncommon name → medium
+  No discrepancy + 0 overlap + common name → low (include but flag)
+  Discrepancy + ≥2 overlaps → medium
+  Discrepancy + ≤1 overlap → REJECT (return empty)
+
+STEP 6 — RETURN
+Return ONLY raw JSON (no markdown):
+{ "is_deceased": null, "date_of_death": "", "death_location": "", "marital_status_at_death": "", "surviving_spouse": "", "survivors": [], "ancestry_children": [], "maiden_name": "", "obituary_url": "", "obituary_text": "", "confidence": "high|medium|low", "source": "", "notes": "" }
+
+If no obituary found after 2 searches: return the structure above with confidence: 'low', notes: 'No obituary found'. If Ancestry SSDI confirms death, set is_deceased: true.
+MAX TOOL CALLS: 9. NEVER exceed 9. NEVER throw errors.
+
+=== Genealogist (agent) ===
+You are the Genealogist. Your job is to record the final, completed heir tree to the database and close out the research session.
+
+You receive the Intestate Expert's final determination (cascade_needed=false, full heir_shares).
+
+Call Write Family Tree Database with the complete heir determination. Pass all required fields. Return a brief confirmation JSON.
+
+=== Person Compiler (code) ===
+
+// Source nodes (v2)
+const orch = $('Parse Vital Status').first().json;
+const obit = $('Parse Obit Deep').first().json;
+const scr  = $('Parse Surname Crosser').first().json;
+
+// Parse Title Attorney raw agent output
+const taRaw = ($input.first().json.output || '').replace(/```json\n?/g, '').replace(/```/g, '').trim();
+let ta = {};
+try {
+  ta = JSON.parse(taRaw);
+} catch(_) {
+  const s = taRaw.indexOf('{');
+  const e = taRaw.lastIndexOf('}');
+  if (s !== -1 && e > s) {
+    try { ta = JSON.parse(taRaw.slice(s, e + 1)); } catch(_) {}
+  }
+}
+
+// Resolve vital status — VSR is now authoritative; obituary can upgrade deceased confidence
+let vital_status = orch.vital_status || 'unknown';
+if (obit.is_deceased === true  && vital_status === 'unknown') vital_status = 'deceased';
+if (obit.is_deceased === false && vital_status === 'unknown') vital_status = 'living';
+
+const deedCheck  = ta.deed_check  || {};
+const courtCheck = ta.court_check || {};
+const estFiled   = courtCheck.estate_filed !== undefined ? courtCheck.estate_filed : null;
+const hadWill    = courtCheck.had_will     !== undefined ? courtCheck.had_will     : null;
+
+const cascade_needed = vital_status === 'deceased' && estFiled !== true;
+
+// cascade_relatives come directly from Parse Surname Crosser (already merged + deduplicated)
+const cascade_relatives = scr.cascade_relatives || [];
+
+const identity = orch.matched_identity || {};
+const obitConf = obit.confidence || scr.obit_confidence || '';
+
+return [{ json: {
+  name:              orch.name || '',
+  property_id:       orch.property_id,
+  session_id:        orch.session_id,
+  queue_id:          orch.queue_id,
+  loop_context:      orch.loop_context || 'worker',
+  relationship_hint: orch.relationship_hint || '',
+  age:               orch.age || '',
+  phone:             orch.phone || '',
+  address:           orch.address || '',
+  county:            orch.county || '',
+  parcel_id:         orch.parcel_id || '',
+  matched_identity:  identity,
+  cascade_relatives,
+  vital_status,
+  deceased_facts: {
+    date_of_death:           scr.obit_date_of_death || obit.date_of_death || '',
+    marital_status_at_death: scr.obit_marital_status || obit.marital_status_at_death || '',
+    surviving_spouse_name:   scr.obit_surviving_spouse || obit.surviving_spouse || '',
+    estate_filed:            estFiled,
+    had_will:                hadWill,
+    family_alive_at_death:   scr.obit_survivors || obit.survivors || [],
+  },
+  deed_transfers:  deedCheck.transfers || [],
+  cascade_needed,
+  obituary_url:    scr.obit_url  || obit.obituary_url  || '',
+  obituary_text:   scr.obit_text || obit.obituary_text || '',
+  claim_sources: {
+    date_of_death: {
+      value:      scr.obit_date_of_death || obit.date_of_death || '',
+      source:     (scr.obit_url || obit.obituary_url) ? 'obituary' : (identity.dod ? 'skipgenie' : 'unknown'),
+      url:        scr.obit_url || obit.obituary_url || '',
+      confidence: (scr.obit_date_of_death || obit.date_of_death) ? (obitConf || 'medium') : 'none',
+    },
+    marital_status_at_death: {
+      value:      scr.obit_marital_status || obit.marital_status_at_death || '',
+      source:     (scr.obit_marital_status || obit.marital_status_at_death) ? 'obituary' : 'unknown',
+      confidence: (scr.obit_marital_status || obit.marital_status_at_death) ? 'medium' : 'none',
+    },
+    estate_filed: {
+      value:        estFiled,
+      source:       estFiled !== null ? 'nc_courts' : 'unknown',
+      case_numbers: (courtCheck.cases || []).map(c => c.case_number).filter(Boolean),
+      confidence:   estFiled !== null ? 'high' : 'low',
+    },
+    had_will: {
+      value:      hadWill,
+      source:     hadWill !== null ? 'register_of_actions' : 'unknown',
+      confidence: hadWill !== null ? 'medium' : 'none',
+    },
+    family_alive_at_death: {
+      sources:    (scr.obit_survivors || obit.survivors || []).length ? ['obituary'] : [],
+      confidence: (scr.obit_survivors || obit.survivors || []).length ? (obitConf || 'medium') : 'none',
+
+
+=== Surname Crosser (agent) ===
+You are the Surname Crosser. Your job is to find children and descendants of a deceased person who may have DIFFERENT surnames (due to marriage, adoption, or paternal lineage).
+
+SELF-GATE: If the person's vital_status is 'living', return immediately:
+{ "scr_children": [], "notes": "Person is living — surname cross not needed" }
+
+STEP 1 — ANCESTRY PARENT-MODE SEARCH
+Search for records that list this person as a parent.
+Call Ancestry Search (SCR) with:
+  - first_name: '' (empty — searching for records that name this person as parent)
+  - last_name: this person's last name
+  - mother: this person's full name (if female/unknown gender)
+  OR father: this person's full name (if male)
+  - state: 'NC'
+This returns records where the person appears as mother/father — revealing children's names and their surnames at birth.
+
+STEP 2 — EVALUATE RESULTS
+From Ancestry results, collect every unique child name found across all matching records.
+Focus on: children[] arrays in matched records, and person_name records where this person appears in parents[].
+
+STEP 3 — NC VOTER CROSS-REFERENCE (for up to 3 high-priority new names)
+For children with surnames different from the deceased person:
+  Call NC Voter (SCR) with the child's name to get their current address and confirm identity.
+  Call Write Voter Record (SCR) with search_context='surname_crosser' to save the finding.
+
+STEP 4 — OUTPUT
+Return ONLY raw JSON (no markdown):
+{
+  "scr_children": [
+    { "name": "", "relationship": "child", "surname_source": "ancestry_parent_mode", "voter_confirmed": false }
+  ],
+  "notes": ""
+}
+
+MAX TOOL CALLS: 6. NEVER exceed 6. NEVER return non-JSON.
+
+=== Vital Status Researcher (agent) ===
+You are the Vital Status Researcher. Your dual job: (1) select the best SkipGenie candidate for the person being researched, and (2) determine whether that person is currently living or deceased using NC voter registration and Ancestry SSDI records.
+
+STEP 1 — CANDIDATE SELECTION
+The prompt you receive contains the full candidate-scoring context (SKIPGENIE CANDIDATES, PROPERTY IDENTITY SIGNALS, PERSONS ALREADY RESEARCHED). Apply the scoring rules exactly as described and identify the best matching candidate. If the top score is 0 or below, set selected_index: null.
+
+STEP 2 — NC VOTER LOOKUP (1-3 lookups)
+Use NC Voter Lookup to check voter registration status for the selected candidate's name (or input name if no candidate selected).
+  - Search by last_name + first_name. If gender is female and a maiden surname is likely     different, also search by maiden surname.
+  - status=A (Active) → strong living signal.
+  - status=R (Removed) → possible deceased or moved.
+  - Not found → unknown.
+After each voter lookup, call Write Voter Record to save the result with search_context='vital_status_researcher'. Pass session_id and property_id from your input.
+
+STEP 3 — ANCESTRY SSDI CHECK (run when vital status is uncertain or person expected deceased)
+Call Ancestry Search with: first_name, last_name, death_location='North Carolina'.
+Look for SSDI (Social Security Death Index) or NC Death Certificate records.
+A confirmed SSDI hit with matching name and NC location = strong deceased signal.
+
+STEP 4 — VITAL STATUS DETERMINATION
+  - Active voter + no SSDI → vital_status: 'living', confidence: 'high'
+  - SSDI confirmed + inactive/removed voter → vital_status: 'deceased', confidence: 'high'
+  - SSDI confirmed + no voter → vital_status: 'deceased', confidence: 'high'
+  - Removed voter only → vital_status: 'deceased', confidence: 'medium'
+  - No voter + no SSDI → vital_status: 'unknown', confidence: 'low'
+  - Active voter + SSDI (contradictory) → vital_status: 'unknown', confidence: 'low'
+
+STEP 5 — OUTPUT
+Return ONLY this raw JSON object. No markdown. No prose. No code fences.
+{
+  "selected_index": null,
+  "subject_name": "",
+  "reason": "",
+  "vital_status": "living|deceased|unknown",
+  "vital_status_confidence": "high|medium|low",
+  "voter_status": "active|inactive|removed|not_found",
+  "voter_ncid": "",
+  "voter_full_name": "",
+  "voter_county": "",
+  "ssdi_found": false,
+  "ssdi_dod": ""
+}
+
+MAX TOOL CALLS: 5 total (voter lookups + ancestry + write voter combined).
+NEVER exceed 5 tool calls. NEVER return non-JSON.
+
+=== Orch - SkipGenie Result (code) ===
+// Parse SkipGenie agent output (JSON text in output field)
+const item = $input.first().json;
+const raw = (item.output || '').trim();
+if (!raw) return [{ json: item }];
+let parsed = {};
+try {
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+  parsed = JSON.parse(cleaned);
+} catch(_) {
+  const s = raw.indexOf('{');
+  const e = raw.lastIndexOf('}');
+  if (s !== -1 && e > s) {
+    try { parsed = JSON.parse(raw.slice(s, e + 1)); } catch(_) {}
+  }
+}
+return [{ json: parsed }];

@@ -1,0 +1,1854 @@
+{
+  "name": "Heir Tracer v4",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heir-tracer",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9959105c-ab2e-4119-a614-59d13371210e",
+      "name": "Webhook",
+      "webhookId": "109370a4-d1ad-4441-8e39-f9c7b0ce51af"
+    },
+    {
+      "id": "bab81353-0323-4b24-8cb1-48f40cef7a48",
+      "name": "Create Heir Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/session",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"property_id\": $json.body.property_id, \"county\": $json.body.county, \"state\": $json.body.state } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "251f3f2d-778d-4c40-81af-2d4131847cf5",
+      "name": "Root Owner Research",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Research the deceased property owner:\n\nProperty ID: {{ $json.property_id }}\nSession ID: {{ $json.session_id }}\nRoot Decedent: {{ $json.root_decedent_name }}\nCounty: {{ $json.county }}\nState: {{ $json.state }}",
+        "options": {
+          "systemMessage": "You are the Root Research Agent. Research the deceased property owner comprehensively.\n\nMANDATORY STEPS (in order):\n1. Use Load Property State to get property details and owner name.\n2. Search SkipGenie for the decedent. Load Property State runs first (step 1) — use its output to pass: first_name, last_name, state=\"NC\", city=<property city> (e.g. \"Wake Forest\"), zip_code=<property zip>, AND street_address=<property street address> (e.g. \"631 E Nelson Ave\"). The street address is the single most effective filter — it surfaces people who lived at or near the property. Name + state alone returns nothing; city/zip/street together are far more precise. SkipGenie is helpful but optional — if it returns no match, continue through ALL remaining steps using the property owner name directly. Do not stop.\n3. Search NC voter registration (NC Voter Root) using the best name available: SkipGenie matched name if found, otherwise the property owner name as-is.\n4. **Ancestry Search Save Root — direct search** (atomic search + DB write): pass session_id, property_id, first_name + last_name + death_location=\"[County], North Carolina\" (e.g. \"Wake, North Carolina\") + death_year=[infer in priority order: (a) SkipGenie dod if populated, (b) SkipGenie last_address end-date year, (c) deed/property record date if available, (d) omit death_year entirely and search without it] + collection_id=\"61843\". The endpoint pre-ranks results by NC location + death year proximity — review ALL returned records_summary entries (up to 50) before selecting.\n\n**Record selection — mandatory steps:**\n  - STEP A — Hard reject: discard any record whose death_location contains a US state name other than \"North Carolina\" / \"NC\" (e.g. Texas, Virginia, Georgia). A different state in death_location is disqualifying regardless of year match.\n  - STEP B — Soft filters: among remaining candidates, prefer in order: (1) dod year matches inferred death year ±2; (2) children[] names overlap with any known relative (SkipGenie if available, or other Ancestry/obit findings); (3) dob plausible given likely age at death.\n  - STEP C — If no NC-location record passes, set best_candidate=none and proceed to step 4c (parent-mode) before falling back to a non-NC record.\n  - Reject records with dod before 1960.\n4b. **MANDATORY — Ancestry Record Root**: after picking the best obit candidate from step 4, call Ancestry Record Root using the record's **source_url** (preferred) or bare record_id as the record_id parameter, plus session_id+property_id. Always prefer source_url — the bare numeric record_id resolves to the wrong endpoint for Newspapers.com collection records and will 404. The detail page returns the canonical surname-bearing children list (\"Mary Justice\" not \"Mary\"). Do not skip — the search-results card is incomplete.\n4c. **Parent-mode discovery — WARNING: DO NOT USE collection_id='61843' with mother= or father=.** The obituary index does not store parent names as structured fields — passing mother= or father= into collection_id='61843' returns 39,000+ noise results and will not find children. Skip this step entirely. Use step 4d (census household) instead to find siblings/children.\n4d. **Census discovery** — call Ancestry Search Save Root with last_name=<root surname> + first_name=<root first name> + state=\"NC\" + collection_id=\"2442\" (1940 census). Find a census record for the root or a known family member. **Record selection for census:** Hard-reject any record whose birth_location or residence is outside North Carolina (e.g. New Jersey, Virginia, Georgia). Among NC records, prefer dob closest to the root's known birth year (inferred from SkipGenie dob or dod minus age). 4d-b. **MANDATORY followup** — take the source_url from the best NC census hit in step 4d and call Ancestry Household Root. This returns all household members with relationship_to_head (Son/Daughter/Wife/etc.). Children listed here are siblings who may not appear in any obituary — add them to cascade_relatives. NOTE: source_url may be empty in search results; if so, construct it as: https://www.ancestry.com/search/collections/<collection_id>/records/<record_id>\n5. Use Brave Search Root for: \"[Full Name] obituary [county] NC [death year or approximate year]\"\n6. If obituary URL found on a public site (NOT ancestry.com): Fetch Obit Root to get full text.\n7. Search NC Courts for estate/probate: Court Search Root with name in \"LAST, FIRST\" format (e.g. \"HAYES, LYDIA\") + county. Server now auto-retries name variants — just pass the most complete form you have. This step is ALWAYS mandatory — run it even if SkipGenie returned nothing. A filed probate or estate case is often the single most authoritative source for the heir list.\n8. If estate case found: Register Actions Root to see filings. Court Doc Root for the probate PDF. If the probate document names heirs explicitly, those names are definitive — use them as the primary cascade_relatives list.\n\nIMPORTANT — NO SKIPGENIE FALLBACK CHAIN:\nIf SkipGenie returns no match: do NOT stop or reduce effort. Steps 4–8 (Ancestry, obit, probate) are INDEPENDENT of SkipGenie and often yield richer heir data. Obituaries name survivors. Ancestry parent-mode surfaces married children. Probate documents name heirs legally. Any of these alone can complete the research.\n\nNAME RESOLUTION RULES (CRITICAL):\n- NEVER emit a relative with only a first name (e.g. just \"Mary\"). Single-token names get silently dropped downstream.\n- If you find a partial name, resolve it before output by: (a) the Ancestry Record Root detail page (step 4b), (b) parent-mode search (step 4c), or (c) Brave-searching the obit body.\n- If a name remains unresolved after exhausting (a-c), DROP it from output. Do not pass it on.\n- For married daughters, output the married surname as `name` and set `maiden_name` to the birth surname.\n\nWRITE TO DB (mandatory):\n- Write Voter Root: save voter lookup result (even if not found).\n- Write Court Root: save probate findings (REQUIRED when any court case is found).\n- Ancestry writes happen automatically inside Ancestry Search Save Root / Ancestry Record Root — do NOT call Write Ancestry Root separately for those.\n- Use Write Ancestry Root ONLY for legacy/manual record entries not produced by the save-aware tools above.\n\nSESSION CONTEXT: session_id and property_id are in your input — pass them to ALL save-aware tools (without them, no DB write happens).\n\nOUTPUT JSON (no preamble, only this):\n{\n  \"root_decedent_name\": \"...\",\n  \"matched_identity\": { \"full_name\": \"...\", \"dob\": \"...\", \"dod\": \"...\", \"address\": \"...\" },\n  \"vital_status\": \"deceased\",\n  \"date_of_death\": \"...\",\n  \"marital_status_at_death\": \"married|widowed|divorced|single\",\n  \"surviving_spouse_name\": \"...\",\n  \"estate_filed\": true/false/null,\n  \"had_will\": true/false/null,\n  \"obituary_url\": \"...\",\n  \"obituary_text\": \"...(full, do not truncate)...\",\n  \"cascade_relatives\": [{\"name\": \"FIRST LAST\", \"relationship_hint\": \"child|spouse|sibling\", \"maiden_name\": \"...or null\"}]\n}\n\nCASCADE RELATIVES RULES — CRITICAL:\n1. SOURCE PRIORITY: Obituary children (step 4b detail page) and probate named heirs (step 8) are AUTHORITATIVE. When either source explicitly lists children, those are the children — do not add extras.\n2. SKIPGENIE RELATIVES ARE NOT HEIRS: SkipGenie \"possible_relatives\" are useful ONLY for confirming you found the right person (do they share known family names?). Never add a SkipGenie relative to cascade_relatives as a child based solely on shared last name or age gap — those signals are meaningless without a probate or obituary as basis.\n3. MERGE RULE: cascade_relatives = obit children + probate heirs + parent-mode Ancestry results. Add SkipGenie relatives ONLY if they are also named as heirs/survivors in an independent source (obit, probate, census). If the obituary lists children, it is a closed list — do not supplement it with SkipGenie names.\n4. Deduplicate: if the same person appears in multiple qualifying sources, include them ONCE using the most complete name.\nDo NOT output separate \"relatives\" and \"ancestry_family_members\" arrays.",
+          "maxIterations": 30
+        }
+      }
+    },
+    {
+      "id": "bb3e5e39-0209-4d0a-98c8-4cf7f447a15f",
+      "name": "GPT-5-Mini (Root Research)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        200
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BRiOORCgq1BegRm2",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search for a person by name and location using SkipGenie. Returns a list of possible matches, each with: age, date of birth, date of death, deceased status, addresses, phone numbers, emails, possible relatives, and possible associates. Use this first before any other research on a person. Pass as much identifying information as you have — at minimum first name, last name, and state.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"first_name\": \"{{ $fromAI('first_name', 'First name of the person to search') }}\",\n    \"last_name\": \"{{ $fromAI('last_name', 'Last name of the person to search') }}\",\n    \"middle_name\": \"{{ $fromAI('middle_name', 'Middle name if known, leave blank if unknown') }}\",\n    \"state\": \"{{ $fromAI('state', 'Two-letter state code, e.g. NC') }}\",\n    \"city\": \"{{ $fromAI('city', 'City of last known address if known, leave blank if unknown') }}\",\n    \"street_address\": \"{{ $fromAI('street_address', 'Street address if known, leave blank if unknown') }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        300,
+        380
+      ],
+      "id": "7856bcf4-f058-4d4c-8ed2-f3f054c0bd9e",
+      "name": "SkipGenie — Root Decedent"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Loads the full property record, session, transfer history, and existing extractions from the database.\nCall this before calling Title Attorney. Pass the returned data in the Title Attorney call.\nInput: { property_id }\nOutput: { property, session, appraiser_transfer_history, extractions }",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/investigate/property-state",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"property_id\": $fromAI(\"property_id\", \"The property ID to load state for\") } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        300,
+        200
+      ],
+      "id": "31d0b388-2083-4f89-96b7-ea58b27217c5",
+      "name": "Load Property State",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search Ancestry.com obituary collection (61843) for the root decedent. Pass first_name + last_name + death_location (e.g. 'Wake, North Carolina') + death_year (infer from SkipGenie dod or last address end-date) + collection_id='61843'. Returns up to 100 obituary records with dob, dod, children[], and spouse fields.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name. Empty string for parent-mode search.\"), \"last_name\": $fromAI(\"last_name\", \"Last name. Empty string for parent-mode search.\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year, empty if unknown\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year, empty if unknown\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'North Carolina'\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: pass decedent's full name as mother. Empty string for direct search.\"), \"father\": $fromAI(\"father\", \"Parent-mode: pass decedent's full name as father. Empty string for direct search.\"), \"collection_id\": $fromAI(\"collection_id\", \"Always '61843' for U.S. Obituary Collection\"), \"count\": 100, \"state\": \"NC\", \"name_x\": \"1_1\" } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        300,
+        560
+      ],
+      "id": "ancestry-search-root-001",
+      "name": "Ancestry Search Root",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search the web for obituaries and death records. Always search using this format: \"[Full Name] obituary [city] [state] [approximate death year]\". If death year is unknown, omit it. Example: \"Troy Hayes obituary Wake Forest NC 1990\"",
+        "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Query', ``, 'string') }}",
+        "additionalParameters": {}
+      },
+      "type": "@brave/n8n-nodes-brave-search.braveSearchTool",
+      "typeVersion": 1,
+      "position": [
+        300,
+        740
+      ],
+      "id": "22d0a960-0e44-5223-933e-27109b523742",
+      "name": "Brave Search Root",
+      "rewireOutputLogTo": "ai_tool",
+      "credentials": {
+        "braveSearchApi": {
+          "id": "3fPT950eJwKvubjw",
+          "name": "Brave Search account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetch the full text content of an obituary web page. Call this immediately after finding an obituary URL in Brave Search results — pass the URL and get back the full page text. Use this instead of searching again with the URL. Returns plain text extracted from the page.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/fetch-page",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"The full obituary page URL to fetch, e.g. https://www.wagesfuneralhome.com/obituaries/Tracy-M-Hayes?obId=38043249\"), \"max_chars\": 8000 } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        300,
+        920
+      ],
+      "id": "09f8a267-1d2f-5f33-a9c4-b4b4fb47a04d",
+      "name": "Fetch Obit Root",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "id": "fb6f35b9-3bee-5d68-b692-7f5b93280a60",
+      "name": "NC Voter Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        1100
+      ],
+      "parameters": {
+        "toolDescription": "Look up NC voter registration for the root decedent. Pass last_name, first_name. Returns voter status (A=Active, R=Removed).",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/voter/nc/lookup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"first_name\": $fromAI(\"first_name\", \"First name\"), \"county\": $fromAI(\"county\", \"County if known\", \"string\", null) } }}"
+      }
+    },
+    {
+      "id": "bf546f99-2f3a-5908-b0bc-4f8eacd90146",
+      "name": "Write Voter Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        1280
+      ],
+      "parameters": {
+        "toolDescription": "Save voter lookup result for the root decedent. Required: session_id, property_id, search_name, search_context='root_research'.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write-voter",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched\"), \"search_context\": \"root_research\", \"ncid\": $fromAI(\"ncid\", \"NCID if found\", \"string\", null), \"full_name\": $fromAI(\"full_name\", \"Full name if found\", \"string\", null), \"county\": $fromAI(\"county\", \"County if found\", \"string\", null), \"status\": $fromAI(\"status\", \"Status A/I/R/D if found\", \"string\", null), \"notes\": $fromAI(\"notes\", \"Notes\", \"string\", \"\") } }}"
+      }
+    },
+    {
+      "id": "87a111ae-b96c-55e8-9523-73caa76007b1",
+      "name": "Court Search Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        380
+      ],
+      "parameters": {
+        "toolDescription": "Search NC courts for the root decedent's estate/probate case. Pass name in 'LAST, FIRST' format (e.g. 'HAYES, LYDIA') and county.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"name\": $fromAI(\"name\", \"Person name in LAST, FIRST format (e.g. HAYES, LYDIA)\"), \"county\": $fromAI(\"county\", \"County\", \"string\", null) } }}"
+      }
+    },
+    {
+      "id": "fb1991ad-08c0-5bd7-9d7b-93f469b9350d",
+      "name": "Register Actions Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        560
+      ],
+      "parameters": {
+        "toolDescription": "Get full event timeline for a root decedent's court case. Pass case_url from Court Search Root.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/register_of_actions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"case_url\": $fromAI(\"case_url\", \"The case URL from Court Search Root\") } }}"
+      }
+    },
+    {
+      "id": "ba2205ec-c9af-5739-b936-dcbc22d0d625",
+      "name": "Court Doc Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        740
+      ],
+      "parameters": {
+        "toolDescription": "Download and extract a probate court document for the root decedent. Pass case URL.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/pull-document",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"Case URL from Register Actions Root or Court Search\") } }}"
+      }
+    },
+    {
+      "id": "ec9b23e1-2242-5355-bcdc-544169924dd6",
+      "name": "Write Court Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        920
+      ],
+      "parameters": {
+        "toolDescription": "Save root decedent's probate court findings to DB. Required: session_id, property_id, person_name. Include all court and probate data found.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write-court-findings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"person_name\": $fromAI(\"person_name\", \"Decedent full name\"), \"case_number\": $fromAI(\"case_number\", \"Case number\", \"string\", null), \"case_url\": $fromAI(\"case_url\", \"Case URL\", \"string\", null), \"case_type\": $fromAI(\"case_type\", \"Case type E/SP\", \"string\", null), \"estate_filed\": $fromAI(\"estate_filed\", \"Whether estate was filed\", \"boolean\", null), \"had_will\": $fromAI(\"had_will\", \"Whether decedent had a will\", \"boolean\", null), \"named_persons\": $fromAI(\"named_persons\", \"Named persons from probate\", \"json\", []), \"probate_family_tree\": $fromAI(\"probate_family_tree\", \"Family tree from probate PDF\", \"json\", []), \"extraction_summary\": $fromAI(\"extraction_summary\", \"Summary of extracted data\", \"string\", \"\") } }}"
+      }
+    },
+    {
+      "id": "c91c2eaa-10ac-5f4c-8aea-97d061053966",
+      "name": "Write Ancestry Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1100
+      ],
+      "parameters": {
+        "toolDescription": "(LEGACY — prefer Ancestry Search Save Root) Save Ancestry records to DB. Required: session_id, property_id, search_name, records[].",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write-ancestry",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched on Ancestry\"), \"records\": $fromAI(\"records\", \"Array of Ancestry records found\", \"json\", []) } }}"
+      }
+    },
+    {
+      "id": "add24627-d08e-51c5-94bc-9ee5234e428c",
+      "name": "Ancestry Search Save Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        380
+      ],
+      "parameters": {
+        "toolDescription": "Search Ancestry AND auto-save raw results to DB in one call. REQUIRED: session_id, property_id. Plus one of: first_name+last_name, OR mother=<full name>, OR father=<full name>. Use this instead of the legacy Ancestry Search Root → Write Ancestry Root pair. Returns compact records_summary (with children/parents intact). Three usage modes for the root decedent: (1) DIRECT: first_name+last_name+death_year+death_location+collection_id='61843' to find the obit. (2) PARENT-MODE: mother=<full name> OR father=<full name> + last_name=<surname> + collection_id='61843' to find records where decedent is named as parent. (3) CENSUS: last_name=<surname>+state='NC'+collection_id='2442' for 1940 census household members.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name. Empty string for parent-mode.\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name. Empty string for parent-mode if needed.\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year, empty if unknown\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year, empty if unknown\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'Wake, North Carolina'\", \"string\", \"\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: decedent full name as mother. Empty for direct.\", \"string\", \"\"), \"father\": $fromAI(\"father\", \"Parent-mode: decedent full name as father. Empty for direct.\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"Ancestry collection_id e.g. 61843 (obits), 2442 (1940 census), or empty for global\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State e.g. 'NC'\", \"string\", \"NC\"), \"name_x\": $fromAI(\"name_x\", \"Exact-match flags, default '1_1'\", \"string\", \"1_1\") } }}"
+      }
+    },
+    {
+      "id": "da20e01a-a7e0-5a27-baaa-e8fe8ebe9c16",
+      "name": "Ancestry Record Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        560
+      ],
+      "parameters": {
+        "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. REQUIRED: session_id, property_id, record_id (numeric ID OR full URL). The search results card is incomplete — the detail page has the canonical structured Child field with full surnames (e.g. 'Mary Justice' not 'Mary'). Always call this after selecting the best obit candidate from Ancestry Search Save Root.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"Ancestry record_id (numeric) or full record URL\"), \"state\": $fromAI(\"state\", \"State e.g. 'NC'\", \"string\", \"NC\") } }}"
+      }
+    },
+    {
+      "id": "817ce5a7-0015-5981-b9c4-ee0feb143733",
+      "name": "Ancestry Household Root",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        740
+      ],
+      "parameters": {
+        "toolDescription": "Fetch all members of the same census household given any Ancestry census record URL. Use after step 4d when you have a census source_url — returns all household members with relationship_to_head. Children appear as 'Son' or 'Daughter'. More reliable than obituary parent searches for finding all siblings.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/household",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"record_url\": $fromAI(\"record_url\", \"Ancestry census record URL from step 4d search result source_url field\") } }}"
+      }
+    },
+    {
+      "id": "c8108b7e-0e95-56e5-a467-4bdf54ab48e4",
+      "name": "Write Root Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function() {\n  try {\n    const raw = $('Root Owner Research').first().json.output || '';\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const m = cleaned.match(/\\{[\\s\\S]*\\}/);\n    const parsed = JSON.parse(m ? m[0] : cleaned);\n    const sess = $('Create Heir Session').first().json;\n    const name = parsed.root_decedent_name || parsed.matched_identity?.full_name || sess.root_decedent_name || 'Unknown';\n    return {\n      session_id:        sess.session_id,\n      property_id:       sess.property_id,\n      input_name:        name,\n      relationship_hint: 'root_decedent',\n      level:             0,\n      research_phase:    'complete',\n      vital_status:      parsed.vital_status || 'deceased',\n      matched_identity:  parsed.matched_identity || {},\n      obituary_url:      parsed.obituary_url || '',\n      obituary_text:     parsed.obituary_text || '',\n      deceased_facts: {\n        date_of_death:           parsed.date_of_death || '',\n        marital_status_at_death: parsed.marital_status_at_death || '',\n        surviving_spouse_name:   parsed.surviving_spouse_name || '',\n        estate_filed:            parsed.estate_filed,\n        had_will:                parsed.had_will,\n        family_alive_at_death:   parsed.cascade_relatives || [],\n      },\n      cascade_relatives: parsed.cascade_relatives || [],\n    };\n  } catch(e) {\n    const sess = $('Create Heir Session').first().json;\n    return { session_id: sess.session_id, property_id: sess.property_id, input_name: sess.root_decedent_name || 'Unknown', level: 0, research_phase: 'complete', vital_status: 'deceased' };\n  }\n})() }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "f2987d22-9ef0-57e5-b2c2-c96b48fb3ef6",
+      "name": "Queue Initial Relatives",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function() {\n  try {\n    const raw = $('Root Owner Research').first().json.output || '';\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const m = cleaned.match(/\\{[\\s\\S]*\\}/);\n    const parsed = JSON.parse(m ? m[0] : cleaned);\n    const sess = $('Create Heir Session').first().json;\n    const relatives = parsed.cascade_relatives || [];\n    return {\n      session_id: sess.session_id,\n      property_id: sess.property_id,\n      depth: 1,\n      persons: relatives.map(r => ({\n        name: r.name,\n        relationship_hint: r.relationship_hint || 'child',\n        maiden_name: r.maiden_name || null,\n        depth: 1,\n      })),\n    };\n  } catch(e) {\n    const sess = $('Create Heir Session').first().json;\n    return { session_id: sess.session_id, property_id: sess.property_id, persons: [], _error: e.message };\n  }\n})() }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "8ec171ae-81ae-5781-9df0-e8cf35315f22",
+      "name": "Trigger Orchestrator Init",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/heir-orchestrator",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function() {\n  try {\n    const q = $('Queue Initial Relatives').first().json;\n    const sess = $('Create Heir Session').first().json;\n    const firstQueued = (q.queued || [])[0] || null;\n    if (!firstQueued) {\n      return {\n        session_id: sess.session_id,\n        property_id: sess.property_id,\n        county: sess.county || '',\n        person_name: '',\n        relationship_hint: '',\n        queue_id: null,\n        _no_persons: true,\n      };\n    }\n    return {\n      session_id: sess.session_id,\n      property_id: sess.property_id,\n      county: sess.county || '',\n      person_name: firstQueued.person_name,\n      relationship_hint: firstQueued.person_name || 'child',\n      maiden_name: firstQueued.maiden_name || '',\n      queue_id: firstQueued.queue_id,\n    };\n  } catch(e) {\n    const sess = $('Create Heir Session').first().json;\n    return {\n      session_id: sess.session_id,\n      property_id: sess.property_id,\n      county: sess.county || '',\n      person_name: '',\n      relationship_hint: '',\n      queue_id: null,\n      _error: e.message,\n    };\n  }\n})() }}",
+        "options": {
+          "timeout": 5000
+        }
+      }
+    },
+    {
+      "id": "f4460457-55b6-525d-81ad-1f9b1bd305a2",
+      "name": "Orchestrator Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        1600
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heir-orchestrator",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "d05d01da-2679-5886-986a-9bfcc1c065aa"
+    },
+    {
+      "id": "9ac3b8af-078e-5d04-b2f8-9a5d4b58179d",
+      "name": "Heir Research Orchestrator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        300,
+        1600
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Research this person completely.\\n\\nPerson Name: ${$json.body.person_name}\\nSession ID: ${$json.body.session_id}\\nProperty ID: ${$json.body.property_id}\\nCounty: ${$json.body.county}\\nRelationship Hint: ${$json.body.relationship_hint || ''}\\nQueue ID: ${$json.body.queue_id || ''}\\nMaiden Name: ${$json.body.maiden_name || ''}` }}",
+        "options": {
+          "systemMessage": "You are the Heir Research Orchestrator. Your job is to determine the complete legal heir list for one person in an NC estate research session and write that result to the database.\n\n## Your Goal (per invocation)\n\nYou receive ONE person to research. For that person, determine:\n1. **vital_status** — are they living or deceased?\n2. **estate_filed** — did they file a probate in NC courts?\n3. **cascade_needed** — do we need to find their heirs (deceased + no filed estate)?\n4. **cascade_relatives** — who are their heirs if cascade is needed?\n\nOne invocation = one person. New persons discovered (children from an obit, beneficiaries from probate) are QUEUED via Queue Persons (Orch) and picked up by the next invocation. Do NOT research discovered persons now.\n\n## Reasoning Loop (not a fixed sequence — adapt based on what you learn)\n\n**Start every new person with:**\n1. Load Person (Orch) — check what's already saved. If research_phase=\"complete\", skip all tool calls.\n2. If matched_identity is empty → call SkipGenie (Orch). NEVER call SkipGenie twice for same person. IMMEDIATELY write via Write Person (Orch) with matched_identity before doing anything else.\n\n**SkipGenie address strategy — more fields = better match:**\n- Always pass city=property city (e.g. \"Wake Forest\") AND zip_code=property zip (e.g. \"27587\"). County alone is too broad.\n- For the first person you research: call Load Property State first to get the property street address (e.g. \"631 E Nelson Ave\"). Pass that as street_address — SkipGenie will surface people who lived near that address.\n- For subsequent persons (children, heirs): pass the property street_address as well — family members very often lived on the same street or nearby. This is the single most effective way to distinguish the right \"Mary Justice\" from other people with the same name.\n- If a prior SkipGenie result returned a known address for a relative, pass that address for the relative's own search.\n- Pass middle_name if known from obituary or deed records.\n\n**Vital status:**\n3. NC Voter (Orch) — Active = living (high confidence). Write voter record immediately. If Active → close: vital_status=living, cascade_needed=false, done.\n4. If voter Removed or not found → check SSDI via Ancestry Search Save (Orch) with collection_id=\"2442\".\n5. If SSDI confirms death → deceased. If not → try obituary search next.\n\n**Court research (for every deceased person — always):**\n6. Court Researcher Tool (sub-agent) — pass person_name, county, session_id, property_id. It handles Court Search variants, ROA, and Document Pull internally. Returns {estate_filed, had_will, case_number, case_url, named_persons[], notes}.\n   - If estate_filed=true with named_persons → cascade_needed=false, queue those named persons, write person, done.\n   - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], done permanently.\n\n**Obituary research (only if no probate found with named persons):**\n7. Ancestry Search Save (Orch) — collection_id=\"61843\", first_name+last_name+death_location=\"[County], NC\"+death_year. Saves automatically to DB.\n8. Ancestry Record (Orch) — ALWAYS call after picking best obit candidate. Use source_url (not bare record_id). Gets canonical full-name children list.\n9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: \"[FULL NAME] obituary [county] NC [year]\".\n10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.\n\n**Census household (when obit didn't name all children):**\n11. Ancestry Search Save (Orch) with collection_id=\"2442\" + first_name + last_name + birth_year + state=\"NC\" — find a census record for this person or a known family member.\n11b. Ancestry Household (Orch) — pass the source_url from step 11. Returns all household members with relationship_to_head. Children = 'Son' or 'Daughter'. More reliable than obituary parent searches.\nNOTE: Do NOT pass father= or mother= into collection_id=\"61843\" — the obituary index does not store parent names as structured fields and returns tens of thousands of noise results.\n\n**Deeds (for property owners / high-value heirs):**\n13. Wake Deeds (Orch) / Buncombe Deeds (Orch) / Mecklenburg Deeds (Orch) — use based on property county. Surfaces deed transfers to named heirs.\n\n**Synthesis (after researching):**\n14. Determine final cascade_relatives from (in priority): probate named_persons > obit children (from detail page) > parent-mode Ancestry > Census. NEVER use SkipGenie possible_relatives as heirs.\n15. Queue Persons (Orch) — queue all newly discovered heirs. Include relationship_hint and maiden_name if known.\n16. Write Person (Orch) — final write with vital_status, estate_filed, had_will, cascade_needed, cascade_relatives, research_phase=\"complete\".\n\n## Critical Rules\n\n**SkipGenie:** Paid per-call. Check DB first (Load Person). Pass city=property city AND zip_code=property zip AND street_address=property address. The property address anchors the search geographically — family members almost always lived nearby (same street, same zip). Save immediately. possible_relatives are NOT heirs — identity cross-check only. Never call twice.\n\n**Obituary > SkipGenie for heir discovery.** When obit names children, that list is closed. Do not supplement with SkipGenie relatives.\n\n**Probate > Obituary for legal heir list.** If probate names beneficiaries, use those. cascade_needed=false.\n\n**Write as you go.** Voter records → write immediately. Ancestry finds → auto-saved by the tool. Court findings → written by Court Researcher. Person record → write after SkipGenie (early), update after vital status, final write when complete.\n\n**NC Chapter 29 intestate succession:**\n- Deceased + no estate → children are primary heirs (per stirpes).\n- Deceased + no children + no estate → surviving spouse gets half, then parents/siblings.\n- Deceased + estate with named heirs → those are the heirs, cascade_needed=false.\n- Apply this inline at synthesis time.\n\n**Name completeness:** Never queue a single-token name. Resolve partial names via Ancestry parent-mode or Brave Search before queuing. Drop unresolvable partials and note in output.\n\n**Termination conditions (close the branch):**\n- Active voter → living, no cascade.\n- Probate with named persons → cascade to those persons only.\n- Probate with has_issue=false → no children, branch permanently closed.\n- Obituary with explicit children list → that list is the closed heir set.\n- All 4 Court Search variants returned nothing → estate_filed=false.\n- All search strategies exhausted → write best known data, done.\n\n## SkipGenie Name Hints\n\nCollections:\n- 61843 = U.S. Obituary Collection (primary for heir discovery)\n- 2442 = SSDI / Social Security Death Index (vital status confirmation)\n- 63277 = Ancestry Family Trees (soft signal, user-contributed)\n\n## Output (return when done researching this person)\n\nReturn ONLY this JSON (no preamble):\n{\n  \"person_name\": \"FIRST LAST\",\n  \"vital_status\": \"living|deceased|unknown\",\n  \"estate_filed\": true/false/null,\n  \"had_will\": true/false/null,\n  \"cascade_needed\": true/false,\n  \"cascade_relatives\": [{\"name\": \"FIRST LAST\", \"relationship_hint\": \"child|spouse|sibling|beneficiary\", \"maiden_name\": \"...or null\"}],\n  \"persons_queued\": [\"NAME1\", \"NAME2\"],\n  \"notes\": \"Brief summary of key findings and sources used.\"\n}",
+          "maxIterations": 60
+        }
+      }
+    },
+    {
+      "id": "fbbc1de3-048e-52eb-95b2-75968750b122",
+      "name": "GPT-5-Mini (Orch)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        1820
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BRiOORCgq1BegRm2",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search SkipGenie for a person. PAID — check DB first (Load Person). Required: first_name, last_name, state='NC'. CRITICAL for good results: always pass city=property city (e.g. 'Wake Forest' not just 'Wake'), zip_code=property zip (e.g. '27587'), AND street_address=property street address (e.g. '631 E Nelson Ave'). The property address anchors the search — family members typically lived nearby (same street, same zip). Without street+zip, common names like 'Mary Justice' return wrong people or no results. Also pass middle_name if known. NEVER call twice for the same person. Save result immediately via Write Person (Orch). possible_relatives and possible_associates are identity cross-check signals ONLY — not heirs. Pick the result where: deceased=true matches expectation, address is closest to property, and known family names appear in possible_relatives or possible_associates.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name\"), \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"middle_name\": $fromAI(\"middle_name\", \"Middle name if known, else empty string\", \"string\", \"\"), \"street_address\": $fromAI(\"street_address\", \"Street address if known from SkipGenie or deed records, else empty string\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State, default NC\", \"string\", \"NC\"), \"city\": $fromAI(\"city\", \"City or county name — REQUIRED. Name+state alone returns nothing. Pass property county e.g. Wake or city e.g. Raleigh\"), \"zip_code\": $fromAI(\"zip_code\", \"ZIP code if known, else empty string\", \"string\", \"\") } }}"
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        1820
+      ],
+      "id": "0cd51bbe-365f-592e-b981-f353d12dfcfb",
+      "name": "SkipGenie (Orch)"
+    },
+    {
+      "id": "f4f78205-f397-5ca4-b069-914d67e8610a",
+      "name": "NC Voter (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        2000
+      ],
+      "parameters": {
+        "toolDescription": "Look up NC voter registration. Pass last_name, first_name, and county. Active = living (high confidence). Removed = investigate further. Not found = unknown. ALWAYS write result via Write Voter Record (Orch) immediately, even if not found.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/voter/nc/lookup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"first_name\": $fromAI(\"first_name\", \"First name\"), \"county\": $fromAI(\"county\", \"County if known\", \"string\", null) } }}"
+      }
+    },
+    {
+      "id": "4157ce59-c826-5cfd-bc73-0191989858a6",
+      "name": "Ancestry Search Save (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        2180
+      ],
+      "parameters": {
+        "toolDescription": "Search Ancestry AND auto-save results to DB. REQUIRED: session_id, property_id. Three usage modes: (1) OBITUARY: first_name+last_name+death_year+death_location+collection_id='61843' — finds person's own obit. After picking best hit, call Ancestry Record (Orch) for the detail page — it has the full children/survivors list. (2) CENSUS: first_name+last_name+birth_year+state='NC'+collection_id='2442' — find a census record for this person. Pass the returned source_url to Ancestry Household (Orch) to get all household members (children listed as Son/Daughter). (3) SSDI: first_name+last_name+death_year+collection_id='2442' — confirm death date and last residence. WARNING: passing father= or mother= into collection_id='61843' does NOT reliably find children. The obituary index does not store parent names as structured fields — use Ancestry Household instead. Collections: 61843=obituaries, 2442=census/SSDI, 63277=family trees.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name. Empty for parent-mode.\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name.\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'Wake, North Carolina'\", \"string\", \"\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: full name as mother. Empty for direct.\", \"string\", \"\"), \"father\": $fromAI(\"father\", \"Parent-mode: full name as father. Empty for direct.\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"e.g. 61843 (obits), 2442 (SSDI/census), 63277 (trees)\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State e.g. NC\", \"string\", \"NC\"), \"name_x\": $fromAI(\"name_x\", \"Exact-match flags, default 1_1\", \"string\", \"1_1\") } }}"
+      }
+    },
+    {
+      "id": "c3cc6174-a1a9-5e51-b9b5-2fbcd8bc3757",
+      "name": "Ancestry Record (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        2360
+      ],
+      "parameters": {
+        "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. ALWAYS call after selecting best obit candidate from Ancestry Search Save. REQUIRED: session_id, property_id, record_id (source_url preferred — bare numeric ID 404s for Newspapers.com). Detail page has canonical full-name children list (e.g. 'Mary Justice' not 'Mary').",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"Ancestry record_id (source_url preferred) or numeric ID\"), \"state\": $fromAI(\"state\", \"State e.g. NC\", \"string\", \"NC\") } }}"
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search the web for obituaries and death records. Always search using this format: \"[Full Name] obituary [city] [state] [approximate death year]\". If death year is unknown, omit it. Example: \"Troy Hayes obituary Wake Forest NC 1990\"",
+        "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Query', ``, 'string') }}",
+        "additionalParameters": {}
+      },
+      "type": "@brave/n8n-nodes-brave-search.braveSearchTool",
+      "typeVersion": 1,
+      "position": [
+        80,
+        2540
+      ],
+      "id": "62f4cf35-bb74-544d-ba27-3bb8f7468219",
+      "name": "Brave Search (Orch)",
+      "rewireOutputLogTo": "ai_tool",
+      "credentials": {
+        "braveSearchApi": {
+          "id": "3fPT950eJwKvubjw",
+          "name": "Brave Search account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetch the full text content of an obituary web page. Call this immediately after finding an obituary URL in Brave Search results — pass the URL and get back the full page text. Use this instead of searching again with the URL. Returns plain text extracted from the page.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/fetch-page",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"The full obituary page URL to fetch, e.g. https://www.wagesfuneralhome.com/obituaries/Tracy-M-Hayes?obId=38043249\"), \"max_chars\": 8000 } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        2720
+      ],
+      "id": "d6934433-2eca-5c17-8ff6-16e7a15ff989",
+      "name": "Fetch Obituary Page (Orch)",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Wake Deeds\n```\nSearch Wake County Register of Deeds by name or document number.\nUse for name searches — NOT for pulling a deed by book/page.\n\nFor name search:\n  { \"search_type\": \"name\", \"surname\": \"HAYES\", \"first_name\": \"LYDIA\", \"role\": \"grantee\" }\n  role options: grantor | grantee | both\n\nFor document number search:\n  { \"search_type\": \"document\", \"document_number\": \"004714-00624\" }\n\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/county/wake/deeds",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"search_type\": \"{{ $fromAI('search_type', 'name | document') }}\",\n  \"surname\": \"{{ $fromAI('surname', 'Last name for name search') }}\",\n  \"first_name\": \"{{ $fromAI('first_name', 'First name for name search') }}\",\n  \"role\": \"{{ $fromAI('role', 'grantor | grantee | both') }}\",\n  \"document_number\": \"{{ $fromAI('document_number', 'Document number for document search example 004714-00624') }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        2900
+      ],
+      "id": "b752c97d-d1b4-5f71-8426-175e46c12d63",
+      "name": "Wake Deeds (Orch)",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Buncombe Deeds\n```\nSearch Buncombe County Register of Deeds.\nUse when county is \"buncombe\".\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/county/buncombe/deeds",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    search_type: $fromAI(\"search_type\", \"name | document\"),\n    surname: $fromAI(\"surname\", \"Last name for name search\"),\n    first_name: $fromAI(\"first_name\", \"First name for name search\"),\n    role: $fromAI(\"role\", \"grantor | grantee | both\"),\n    document_number: $fromAI(\"document_number\", \"Document number for document search\")\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        3080
+      ],
+      "id": "4bc9799a-fa32-5a21-b505-4fc3dd45bae4",
+      "name": "Buncombe Deeds (Orch)"
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Mecklenburg Deeds\n```\nSearch Mecklenburg County Register of Deeds.\nUse when county is \"mecklenburg\".\nReturns a list of results with book, page, doc_type, grantor, grantee, recording_date.\n```",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/county/mecklenburg/deeds",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  search_type: $fromAI(\"search_type\", \"name | document\"),\n  surname: $fromAI(\"surname\", \"Last name for name search\"),\n  first_name: $fromAI(\"first_name\", \"First name for name search\"),\n  role: $fromAI(\"role\", \"grantor | grantee | both\"),\n  document_number: $fromAI(\"document_number\", \"Document number for document search\")\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        3260
+      ],
+      "id": "2fed608c-ade2-5d7c-89b5-7194afdab979",
+      "name": "Mecklenburg Deeds (Orch)"
+    },
+    {
+      "id": "d8c7b1c6-34b6-5726-9875-6ab9e3664493",
+      "name": "Ancestry Household (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        3440
+      ],
+      "parameters": {
+        "toolDescription": "Fetch all members of the same census household given any Ancestry census record URL. Use when a person's children are not found in their obituary or probate documents. How to use: first call Ancestry Search Save (Orch) with collection_id='2442' to find a census record for this person or a confirmed family member — then pass the returned source_url here. Returns all household members with relationship_to_head (Son, Daughter, Wife, Head, etc.). Children appear as 'Son' or 'Daughter'. This is the most reliable way to find children not mentioned in an obituary — census records capture everyone living in the household.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/ancestry/household",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"record_url\": $fromAI(\"record_url\", \"Ancestry census record URL from a prior search result (source_url field)\") } }}"
+      }
+    },
+    {
+      "id": "b21a24a3-b821-5405-8fd9-6dce79dcd849",
+      "name": "Load Property State (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        2540
+      ],
+      "parameters": {
+        "toolDescription": "Load full property record including street address, city, zip, and county. Call ONCE at the start of a session before your first SkipGenie call. Use property.address.street, property.address.city, property.address.zip as SkipGenie inputs. Family members of the deceased almost always lived nearby — the property address is the best geographic anchor for finding ANY person in this family, not just the root decedent. Pass property_id to retrieve.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/investigate/property-state",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
+      }
+    },
+    {
+      "id": "1e32dfb2-35f7-51b5-9a1c-d62da14e496c",
+      "name": "Load Person (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        1820
+      ],
+      "parameters": {
+        "toolDescription": "Load person's existing research record from DB. Call FIRST before any external API to avoid duplicate paid calls. If research_phase='complete' → skip all tool calls, person is done. If matched_identity is populated → skip SkipGenie. Pass session_id and name.",
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/heir/load-person",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "session_id",
+              "value": "={{ $fromAI(\"session_id\", \"Session ID\") }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $fromAI(\"name\", \"Person full name\") }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0c11c572-1791-555a-9c00-eaae94de6838",
+      "name": "Load Ancestry Records (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        2000
+      ],
+      "parameters": {
+        "toolDescription": "Load Ancestry records saved for this session and person. Pass session_id and optionally search_name to filter. Check before running Ancestry Search Save.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/ancestry-records",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"search_name\": $fromAI(\"search_name\", \"Person name to filter\", \"string\", null) } }}"
+      }
+    },
+    {
+      "id": "bbfa0f2e-007e-5f80-beef-253de8b105b9",
+      "name": "Load Court Findings (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        2180
+      ],
+      "parameters": {
+        "toolDescription": "Load court/probate findings for this session and person. Check before running Court Search. Pass session_id.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/court-findings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"person_name\": $fromAI(\"person_name\", \"Person name to filter\", \"string\", null) } }}"
+      }
+    },
+    {
+      "id": "016a3db2-81a1-557f-af72-a420ea177633",
+      "name": "Load Voter Records (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        2360
+      ],
+      "parameters": {
+        "toolDescription": "Load voter records saved for this session. Check before running NC Voter Lookup. Pass session_id.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/voter-records",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\") } }}"
+      }
+    },
+    {
+      "id": "e3485c30-448d-571d-ada8-b21fdfb8807a",
+      "name": "Write Person (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1820
+      ],
+      "parameters": {
+        "toolDescription": "Create or update a person record in DB (upsert). Safe to call multiple times. Call immediately after SkipGenie with matched_identity. Call after vital status determined. Call at end with cascade_needed, cascade_relatives, research_phase='complete'. REQUIRED: session_id, property_id, input_name, vital_status.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"\"),\n  \"cascade_needed\":    $fromAI(\"cascade_needed\", \"Whether cascade research needed\", \"boolean\", false),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"deceased_facts\":    $fromAI(\"deceased_facts\", \"NC Ch.29 required facts\", \"json\", {}),\n  \"obituary_url\":      $fromAI(\"obituary_url\", \"Obituary URL\", \"string\", \"\"),\n  \"obituary_text\":     $fromAI(\"obituary_text\", \"Full obituary text\", \"string\", \"\"),\n  \"estate_filed\":      $fromAI(\"estate_filed\", \"Whether estate was filed\", \"boolean\", null),\n  \"had_will\":          $fromAI(\"had_will\", \"Whether had a will\", \"boolean\", null),\n  \"cascade_relatives\": $fromAI(\"cascade_relatives\", \"Heir list\", \"json\", []),\n  \"maiden_name\":       $fromAI(\"maiden_name\", \"Maiden name if applicable\", \"string\", \"\"),\n  \"notes\":             $fromAI(\"notes\", \"Research notes\", \"string\", \"\"),\n  \"relationship_hint\": $fromAI(\"relationship_hint\", \"Relationship to root decedent\", \"string\", \"\"),\n  \"queue_id\":          $fromAI(\"queue_id\", \"Queue item ID\", \"number\", null)\n} }}"
+      }
+    },
+    {
+      "id": "fc7b4e4a-8dfb-58d2-8d8c-e7f149de43b3",
+      "name": "Write Voter Record (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        2000
+      ],
+      "parameters": {
+        "toolDescription": "Save voter lookup result to DB. Call after EVERY NC Voter Lookup, including not-found. Required: session_id, property_id, search_name. Saves full_name (may be married name), county, status.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write-voter",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched\"), \"search_context\": $fromAI(\"search_context\", \"Context e.g. orchestrator\", \"string\", \"orchestrator\"), \"ncid\": $fromAI(\"ncid\", \"NCID if found\", \"string\", null), \"full_name\": $fromAI(\"full_name\", \"Full legal name if found — may differ (married name)\", \"string\", null), \"county\": $fromAI(\"county\", \"County if found\", \"string\", null), \"status\": $fromAI(\"status\", \"Status A/I/R/D if found\", \"string\", null), \"notes\": $fromAI(\"notes\", \"Notes\", \"string\", \"\") } }}"
+      }
+    },
+    {
+      "id": "6f6a5878-9395-543c-afd2-efe031a82ded",
+      "name": "Queue Persons (Orch)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        2180
+      ],
+      "parameters": {
+        "toolDescription": "Add new persons to the research queue. Use when new heirs/children are discovered during research. Required: session_id, property_id, persons=[{name, relationship_hint, maiden_name}]. Server deduplicates. Do NOT queue: the current person, single-token names, 'Estate of', 'Heirs of'.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"depth\": $fromAI(\"depth\", \"Depth level for cascade\", \"number\", 1), \"persons\": $fromAI(\"persons\", \"Array of {name, relationship_hint, maiden_name} to queue\", \"json\", []) } }}"
+      }
+    },
+    {
+      "id": "38c08a50-347e-5076-a5f8-dedc3c80cf46",
+      "name": "Court Researcher Tool",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        2360
+      ],
+      "parameters": {
+        "toolDescription": "Call the Court Researcher sub-agent to handle ALL probate research for one person. Call for EVERY deceased person without exception — even if an obit was found. Probate supersedes obituary for the legal heir list. Pass person_name, county, session_id, property_id. Returns: {estate_filed, had_will, case_number, case_url, named_persons[], notes}. If estate_filed=true with named_persons → cascade_needed=false, use those as heirs.",
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/heir-court-researcher",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"person_name\": $fromAI(\"person_name\", \"Full name of person to research\"), \"county\": $fromAI(\"county\", \"NC county for court search\"), \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
+      }
+    },
+    {
+      "id": "cd3d6bed-70d1-5923-b12f-d4113bec9fcd",
+      "name": "Mark Person Done (Orch)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        1600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/complete-person",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"queue_id\": $('Orchestrator Webhook').first().json.body.queue_id } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "146dcab5-9c3d-5410-bed7-02b30489fc2f",
+      "name": "Check Queue Status (Orch)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        1600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/next-person",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $('Orchestrator Webhook').first().json.body.session_id } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "24876f39-e388-5dc0-8ca2-c5f97e98c1d8",
+      "name": "If Queue Empty (Orch)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        1600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ff933681-9d66-5972-a7f9-bf1d7a376b02",
+              "leftValue": "={{ $json.item?.person_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "abdcf1d1-ad3b-51a3-ac78-b69366215615",
+      "name": "Self Trigger Orchestrator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        1820
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/heir-orchestrator",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"session_id\":        $('Orchestrator Webhook').first().json.body.session_id,\n  \"property_id\":       $('Orchestrator Webhook').first().json.body.property_id,\n  \"county\":            $('Orchestrator Webhook').first().json.body.county || '',\n  \"person_name\":       $('Check Queue Status (Orch)').first().json.item.person_name,\n  \"relationship_hint\": $('Check Queue Status (Orch)').first().json.item.relationship_hint || '',\n  \"maiden_name\":       $('Check Queue Status (Orch)').first().json.item.maiden_name || '',\n  \"queue_id\":          $('Check Queue Status (Orch)').first().json.item.queue_id\n} }}",
+        "options": {
+          "timeout": 5000
+        }
+      }
+    },
+    {
+      "id": "baf6f321-423f-56c4-ade8-2e49aa547c29",
+      "name": "Trigger Family Assembly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        1600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/heir-family-assembly",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"session_id\":  $('Orchestrator Webhook').first().json.body.session_id,\n  \"property_id\": $('Orchestrator Webhook').first().json.body.property_id\n} }}",
+        "options": {
+          "timeout": 5000
+        }
+      }
+    },
+    {
+      "id": "f2390499-4d08-534b-bce1-5e657bee20b4",
+      "name": "Court Researcher Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        3600
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heir-court-researcher",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "ace7f1ad-2f57-5066-b003-36ff04417b9a"
+    },
+    {
+      "id": "2c8001e2-9383-555c-b01b-b5ff9fdaf169",
+      "name": "Court Researcher Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        300,
+        3600
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Research probate court records for:\\n\\nPerson Name: ${$json.body.person_name}\\nCounty: ${$json.body.county}\\nSession ID: ${$json.body.session_id}\\nProperty ID: ${$json.body.property_id}` }}",
+        "options": {
+          "systemMessage": "You are the Court Researcher. Your job is to research NC probate court records for ONE person and return a structured result.\n\n## Input\n- person_name, county, session_id, property_id (from your input JSON)\n\n## Steps (always all 4, in order)\n\n**Step 1 — Court Search (name variants, never skip)**\nSearch NC Courts Portal. Try these name variants in order until you find an estate case:\n  1. \"LAST, FIRST\" — no middle names, no suffixes. MOST IMPORTANT — the portal indexes by first+last only.\n     Example: \"HAYES, ALYCE\" not \"HAYES, ALYCE JOYE F\"\n  2. \"LAST, FIRST MIDDLE\" — full name as provided (if it has a middle name)\n  3. \"LAST\" only — noisy but catches edge cases\n  4. \"FIRST LAST\" — no comma, no middle\n\nCase types that indicate a filed estate (DO NOT skip any):\n- \"E\"  = Decedents' Estate\n- \"SE\" = Small Estate (most common for recent deaths)\n- \"SP\" = Special Proceedings\n- \"PR\" = Probate (any sub-type)\n\nIf you find an estate case → IMMEDIATELY call Write Court Findings (CR) with case_number and case_url BEFORE proceeding to ROA or document pull. Even if document pull fails, the case reference is recorded.\n\nIf all 4 variants return zero estate cases → estate_filed=false, record this result, proceed to Return Court Result.\n\n**Step 2 — Register of Actions (if estate case found)**\nCall Register of Actions (CR) with the case_url. Key events to note:\n- \"Letters Testamentary\" → had_will=true\n- \"Letters of Administration\" → had_will=false (intestate)\n- \"Deed of Distribution\" → real property transferred — grantees may be named heirs\n\nIf roa_unavailable=true (WAF block): skip, use case data from Court Search.\n\n**Step 3 — Court Document Pull (if estate case found)**\nCall Court Document Pull (CR) with case_url. Extract:\n- named_persons[] — every person named as heir, executor, beneficiary, or relative\n  Format: [{\"name\": \"FIRST LAST\", \"role\": \"heir|executor|beneficiary|relative\", \"has_issue\": true/false/null}]\n- has_issue=false in named_persons is the HIGHEST VALUE signal in the system — permanently closes that branch (confirmed no children).\n- decedent_name — full name from the document (confirms you have the right case)\n- family_tree — structured per-person has_issue array\n\nIf documents=[] or pull fails: note \"document pull failed\" and continue to step 4.\n\n**Step 4 — Write Court Findings (CR) (update with extracted data)**\nUpdate the court findings record with named_persons and family_tree. Required: session_id, property_id, person_name.\n\n## Output (return exactly this JSON, no preamble)\n\n{\n  \"estate_filed\": true/false,\n  \"had_will\": true/false/null,\n  \"case_number\": \"...\",\n  \"case_url\": \"...\",\n  \"named_persons\": [{\"name\": \"FIRST LAST\", \"role\": \"beneficiary|heir|executor\", \"has_issue\": true/false/null}],\n  \"notes\": \"Brief summary: case type, date filed, key document findings.\"\n}",
+          "maxIterations": 15
+        }
+      }
+    },
+    {
+      "id": "e1021156-b93c-592d-8af2-7f072483491d",
+      "name": "GPT-5-Mini (Court Researcher)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        3800
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BRiOORCgq1BegRm2",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Court Search\n```\nSearch NC Clerk of Superior Court by party name.\nUse when the Title Attorney needs to find estate, probate, foreclosure, or judgment cases\nfor a specific person or entity.\nRequired: name (full name or last name). Optional: county.\nInput: { name: \"HAYES\" | \"HAYES, LYDIA\", county?: \"Wake\" }\nReturns: list of cases with case_number, case_type, filing_date, parties, case_url.\n```",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/search",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $fromAI('name', 'Full name or last name to search, e.g. HAYES or HAYES, LYDIA') }}"
+            },
+            {
+              "name": "county",
+              "value": "={{ $fromAI('county', 'County name to filter results, leave empty for statewide search') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        3800
+      ],
+      "id": "c15b71c0-babd-5063-adb9-20fb486874fd",
+      "name": "Court Search (CR)"
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Register of Actions\n```\nGet the full event timeline for a specific court case.\nCall after Court Search when you need to inspect a case in detail.\nReturns the foreclosure stage and all case events with dates and descriptions.\nRequired: case_url (from Court Search results).\nInput: { case_url: \"...\" }\n```",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/register_of_actions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"case_url\": \"{{ $fromAI('case_url', 'URL of the court case from Court Search results') }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        3980
+      ],
+      "id": "1b7ccb56-66cb-575c-86a9-a6f1766d5139",
+      "name": "Register of Actions (CR)",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "parameters": {
+        "toolDescription": "### Court Document Pull\n```\nDownload and Claude-extract a probate court document from the NC courts portal.\nUse when Court Search returns a probate/estate case — pass the case URL to get\nthe full family tree PDF extracted as structured JSON with named_persons and\nfamily_tree (including has_issue=false for confirmed no-children branches).\nInput: { url: \"https://portal-nc.tylertech.cloud/app/RegisterOfActions/...\" }\nOutput: { case_id, documents: [{ url, extraction: { named_persons, family_tree, decedent_name, flags, ... } }] }\nThe extraction.family_tree[].has_issue field is critical:\n  false = confirmed no children (branch extinct)\n  true  = confirmed has children\n  null  = not stated\n```",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/court/nc/pull-document",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"url\": $fromAI(\"url\", \"Full NC courts portal URL for the probate case, e.g. https://portal-nc.tylertech.cloud/app/RegisterOfActions/#/ENCRYPTED_ID/anon/portalembed\") } }}",
+        "options": {}
+      },
+      "id": "9e89d041-afce-5894-8f40-e0b2acbfcf2a",
+      "name": "Court Document Pull (CR)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        4160
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Save probate court document findings to the database. REQUIRED: call this after Court Document Pull successfully extracts any probate data, AND after Court Search finds an estate case even if document pull fails. Required: session_id, property_id, person_name. Pass all available fields from court search and document extraction.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write-court-findings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID from input context\"), \"property_id\": $fromAI(\"property_id\", \"Property ID from input context\"), \"person_name\": $fromAI(\"person_name\", \"Full name of the person whose estate case was found\"), \"case_number\": $fromAI(\"case_number\", \"Court case number e.g. 24E002839-910\"), \"case_url\": $fromAI(\"case_url\", \"Full URL of the court case from Court Search\"), \"case_type\": $fromAI(\"case_type\", \"E for Estate, SP for Special Proceedings\"), \"estate_filed\": $fromAI(\"estate_filed\", \"true if estate case found\", \"boolean\"), \"had_will\": $fromAI(\"had_will\", \"true=testate false=intestate null=unknown\"), \"probate_family_tree\": $fromAI(\"probate_family_tree\", \"family_tree array from document extraction, or empty array\"), \"probate_no_issue\": $fromAI(\"probate_no_issue\", \"names confirmed has_issue=false, or empty array\"), \"named_persons\": $fromAI(\"named_persons\", \"named_persons array from extraction, or empty array\"), \"documents\": $fromAI(\"documents\", \"documents array from pull result, or empty array\"), \"notes\": $fromAI(\"notes\", \"Any notes about the probate research\") } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        4340
+      ],
+      "id": "812d6f84-7dea-5b7c-bece-b0e5108e22bb",
+      "name": "Write Court Findings (CR)",
+      "rewireOutputLogTo": "ai_tool"
+    },
+    {
+      "id": "c8e30c2e-19a2-56fa-bbc6-1f630e653b5f",
+      "name": "Return Court Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        3600
+      ],
+      "parameters": {
+        "respondWith": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heir-family-assembly",
+        "options": {},
+        "responseMode": "onReceived"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        4800
+      ],
+      "id": "7175b1ac-8888-4e4a-a2bf-f9fafbfcfdfe",
+      "name": "FA Webhook",
+      "webhookId": "heir-fa-wh-0001"
+    },
+    {
+      "id": "aa99bf7c-844f-5140-8cb2-c73c7d7f6948",
+      "name": "Family Assembler",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        300,
+        4800
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Synthesize family tree for session.\\n\\nSession ID: ${$json.body.session_id}\\nProperty ID: ${$json.body.property_id}` }}",
+        "options": {
+          "systemMessage": "You are the Family Assembler. Your job is to synthesize all research results and write the final family tree.\n\n## Steps\n\n1. **Load Family Dataset (FA)** — load all person records for this session (vital_status, cascade_needed, cascade_relatives, estate_filed, obituary data, court data for every person).\n\n2. **Apply NC Chapter 29 intestate succession** across all persons:\n   - Deceased + estate with named persons → those persons are the heirs (legal heirs)\n   - Deceased + no estate + cascade_relatives → children are primary heirs per stirpes\n   - Deceased + no children + no estate → surviving spouse gets 1/2, remainder to parents or siblings\n   - Living persons → they receive their own share directly\n   - Unknown vital status → include in heir list with uncertainty noted\n   - Persons with has_issue=false → confirmed no children, branch closed\n\n3. **Compute share fractions** for each heir based on the above rules. For per-stirpes: if a deceased heir has N living children, each child takes (parent's share / N).\n\n4. **Write Family Tree (FA)** — write the complete family tree. Required fields: session_id, property_id, root_decedent_name (full name of root decedent), heir_tree (array). Do NOT use \"family_tree\" — the field is named \"heir_tree\".\n\n## Output from Write Family Tree (FA)\n\nThe tree should include all persons in scope:\n- Resolved heirs with share fractions\n- Closed branches (with reason: has_will, has_issue_false, living, etc.)\n- Unknowns with notes\n- Chain-of-title annotations where relevant\n\nReturn a brief summary JSON after writing:\n{\n  \"session_id\": <int>,\n  \"property_id\": <int>,\n  \"total_heirs\": N,\n  \"total_branches\": N,\n  \"open_unknowns\": N,\n  \"notes\": \"...\"\n}",
+          "maxIterations": 20
+        }
+      }
+    },
+    {
+      "id": "00b13eb6-e9d7-542c-bfb1-1d2cd03d7e08",
+      "name": "GPT-5-Mini (FA v4)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        5000
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BRiOORCgq1BegRm2",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "id": "e2b0f5b3-60c2-50de-ae04-d2042ca40bc6",
+      "name": "Load Family Dataset (FA)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        5000
+      ],
+      "parameters": {
+        "toolDescription": "Load all person records for this session — vital_status, cascade_needed, cascade_relatives, estate_filed, obituary data for every person researched. Required: session_id.",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/persons",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\") } }}"
+      }
+    },
+    {
+      "id": "5430abdf-0f9d-58e1-9710-c5cc27e12389",
+      "name": "Write Family Tree (FA)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        5180
+      ],
+      "parameters": {
+        "toolDescription": "Write the final resolved family tree to DB. Call once at the end after applying NC Ch. 29 to all branches. Required: session_id, property_id, root_decedent_name, heir_tree (array of heir nodes with share_fraction and basis).",
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/heir/write",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"root_decedent_name\": $fromAI(\"root_decedent_name\", \"Full name of the root decedent (e.g. Lydia L Hayes)\"), \"heir_tree\": $fromAI(\"heir_tree\", \"Complete heir tree array\", \"json\", []), \"notes\": $fromAI(\"notes\", \"Summary notes\", \"string\", \"\") } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create Heir Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Heir Session": {
+      "main": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5-Mini (Root Research)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie — Root Decedent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Property State": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Search Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brave Search Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Obit Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NC Voter Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Voter Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Search Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Actions Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Doc Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Court Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Ancestry Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Search Save Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Record Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Household Root": {
+      "ai_tool": [
+        [
+          {
+            "node": "Root Owner Research",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Root Owner Research": {
+      "main": [
+        [
+          {
+            "node": "Write Root Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Root Person": {
+      "main": [
+        [
+          {
+            "node": "Queue Initial Relatives",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Initial Relatives": {
+      "main": [
+        [
+          {
+            "node": "Trigger Orchestrator Init",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Webhook": {
+      "main": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5-Mini (Orch)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NC Voter (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Search Save (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Record (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brave Search (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Obituary Page (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wake Deeds (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buncombe Deeds (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mecklenburg Deeds (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Household (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Property State (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Person (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Ancestry Records (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Court Findings (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Voter Records (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Person (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Voter Record (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Persons (Orch)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Researcher Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heir Research Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Mark Person Done (Orch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Person Done (Orch)": {
+      "main": [
+        [
+          {
+            "node": "Check Queue Status (Orch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Queue Status (Orch)": {
+      "main": [
+        [
+          {
+            "node": "If Queue Empty (Orch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Queue Empty (Orch)": {
+      "main": [
+        [
+          {
+            "node": "Trigger Family Assembly",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Self Trigger Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Researcher Webhook": {
+      "main": [
+        [
+          {
+            "node": "Court Researcher Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5-Mini (Court Researcher)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Court Researcher Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Search (CR)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Court Researcher Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register of Actions (CR)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Court Researcher Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Document Pull (CR)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Court Researcher Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Court Findings (CR)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Court Researcher Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Court Researcher Agent": {
+      "main": [
+        [
+          {
+            "node": "Return Court Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FA Webhook": {
+      "main": [
+        [
+          {
+            "node": "Family Assembler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5-Mini (FA v4)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Family Assembler",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Family Dataset (FA)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Family Assembler",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Family Tree (FA)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Family Assembler",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "79ccdf3b-3235-4fe1-bda9-b8d32b7cf51d",
+  "meta": {
+    "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
+  },
+  "tags": []
+}

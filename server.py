@@ -14,6 +14,7 @@ Routes:
     POST /skipgenie                     — first_name, last_name, state or zip_code
     POST /court/nc/search               — name (party name search, statewide)
     POST /court/nc/register_of_actions  — case_url (Register of Actions for one case)
+    POST /court/nc/pull-document        — url (ROA or doc URL → probate extraction)
     POST /investigate/pull-deed         — property_id, book, page → capture_id (Wake ROD combined)
     POST /conclude/data                 — property_id → all DB data for Prompt 4
     POST /conclude/write                — property_id + Prompt 4 output → chain_conclusions row
@@ -55,6 +56,7 @@ from court.nc.search import (
     is_tax_foreclosure,
 )
 from court.nc.session import load_waf_token, refresh_waf_token, _TOKEN_FILE
+from court.nc.pull_document import pull_court_document
 from scout.writer import write as scout_write
 from conclude.handlers import (
     conclude_data as conc_data,
@@ -79,7 +81,8 @@ from investigate.handlers import (
     court_pull as inv_court_pull,
     pull_deed as inv_pull_deed,
 )
-from ancestryapi.client import search as ancestry_search, record_detail as ancestry_record
+from ancestryapi.client import search as ancestry_search, search_paged as ancestry_search_paged, record_detail as ancestry_record, household_members as ancestry_household
+from ncvoter.search import lookup as ncvoter_lookup
 from heir.handlers import (
     create_session as heir_create_session,
     write_person as heir_write_person,
@@ -94,6 +97,15 @@ from heir.handlers import (
     claim_fa_trigger as heir_claim_fa_trigger,
     write_ancestry as heir_write_ancestry,
     load_ancestry_records as heir_load_ancestry_records,
+    recover_stuck_sessions as heir_recover_stuck,
+    queue_recover as heir_queue_recover,
+    write_voter_record as heir_write_voter,
+    load_voter_records as heir_load_voter,
+    write_deed_finding as heir_write_deed_finding,
+    write_court_findings as heir_write_court_findings,
+    load_court_findings as heir_load_court_findings,
+    upsert_person as heir_upsert_person,
+    load_person as heir_load_person,
 )
 
 _lock = threading.Lock()
@@ -293,7 +305,7 @@ def _skipgenie(data: dict) -> tuple[int, dict]:
     state = (data.get("state") or "").strip()
     zip_code = (data.get("zip_code") or "").strip()
     if not state and not zip_code:
-        return 400, {"error": "at least state or zip_code is required"}
+        state = "NC"  # all properties are in NC; broaden to statewide rather than reject
 
     result = skipgenie_lookup(
         first_name=(data.get("first_name") or "").strip(),
@@ -374,6 +386,26 @@ def _nc_captcha_status(_data: dict) -> tuple[int, dict]:
     return 200, _captcha_status
 
 
+def _nc_pull_document(data: dict) -> tuple[int, dict]:
+    """
+    Download and extract a probate/court document from the NC courts portal.
+
+    Required: url  (ROA URL, case URL, or direct document URL)
+    Optional: property_id, session_id (heir session — for context only, not used in download)
+
+    Returns: { case_id, documents: [{ url, extraction }], error }
+    The extraction contains: document_type, decedent_name, named_persons, family_tree, summary.
+    """
+    url = (data.get("url") or "").strip()
+    if not url:
+        return 400, {"error": "url is required"}
+    if not url.startswith(("http://", "https://")):
+        return 400, {"error": "url must start with http:// or https://"}
+
+    result = pull_court_document(url)
+    return 200, result
+
+
 def _nc_court_search(data: dict) -> tuple[int, dict]:
     name = (data.get("name") or "").strip()
     if not name:
@@ -387,15 +419,16 @@ def _nc_court_roa(data: dict) -> tuple[int, dict]:
     case_url = (data.get("case_url") or "").strip()
     if not case_url:
         return 400, {"error": "case_url is required (from register_of_actions_url in search results)"}
+
     events = nc_court_roa(case_url)
+
     stage = classify_foreclosure_stage(events)
-    roa_unavailable = len(events) == 0
     return 200, {
-        "stage": stage,
-        "event_count": len(events),
-        "events": events,
-        "roa_unavailable": roa_unavailable,
-        "note": "Register of Actions API is blocked by WAF for /app/ routes — use Court Search results (case_type, status) to determine estate_filed." if roa_unavailable else None,
+        "stage":        stage,
+        "event_count":  len(events),
+        "events":       events,
+        "roa_unavailable": len(events) == 0,
+        "note": None if events else "Register of Actions unavailable — WAF blocked. Run: python -m court.nc.session to refresh token.",
     }
 
 
@@ -530,7 +563,8 @@ def _scout_write(data: dict) -> tuple[int, dict]:
 # ---------------------------------------------------------------------------
 
 def _ancestry_search(data: dict) -> tuple[int, dict]:
-    result = ancestry_search(
+    collection_id = (data.get("collection_id") or "").strip()
+    kwargs = dict(
         first_name=(data.get("first_name") or "").strip(),
         last_name=(data.get("last_name") or "").strip(),
         birth_year=str(data.get("birth_year") or "").strip(),
@@ -545,8 +579,14 @@ def _ancestry_search(data: dict) -> tuple[int, dict]:
         father=(data.get("father") or "").strip(),
         mother=(data.get("mother") or "").strip(),
         name_x=(data.get("name_x") or "1_1").strip(),
-        count=int(data.get("count") or 50),
+        collection_id=collection_id,
     )
+    # Ancestry serves up to 50 results per SSR page (count=50 is the max effective value).
+    # Paginate via pg= parameter, up to 3 pages = 150 records total.
+    if collection_id:
+        result = ancestry_search_paged(max_pages=3, page_size=50, **kwargs)
+    else:
+        result = ancestry_search(count=int(data.get("count") or 50), **kwargs)
     return 200, result
 
 
@@ -555,6 +595,165 @@ def _ancestry_record(data: dict) -> tuple[int, dict]:
     if not record_id:
         return 400, {"error": "record_id is required"}
     return 200, ancestry_record(record_id)
+
+
+def _ancestry_search_and_save(data: dict) -> tuple[int, dict]:
+    """
+    Atomic search + DB write. Saves the full raw API result to heir_ancestry_records
+    (with children/parents/spouse intact) and returns a compact summary to the LLM.
+
+    LLMs called the previous /ancestry/search + /heir/write-ancestry pair as two
+    separate tools and would re-summarize the records[] payload in between,
+    dropping structured fields. This endpoint removes that opportunity for loss.
+
+    Required: session_id, property_id, plus all /ancestry/search params.
+    Optional: person_id, search_context (passed through as search_name fallback).
+    Returns:  { result_count, returned, records_summary: [...], saved: N }
+    """
+    session_id  = data.get("session_id")
+    property_id = data.get("property_id")
+    if not session_id or not property_id:
+        return 400, {"error": "session_id and property_id are required"}
+
+    status, result = _ancestry_search(data)
+    if status != 200 or "error" in result:
+        return status, result
+
+    records = result.get("records") or []
+
+    search_name = (
+        data.get("search_name")
+        or " ".join(filter(None, [(data.get("first_name") or "").strip(),
+                                   (data.get("last_name") or "").strip()]))
+        or (data.get("mother") or data.get("father") or "").strip()
+        or "unknown"
+    ).strip()
+
+    write_payload = {
+        "session_id":        session_id,
+        "property_id":       property_id,
+        "person_id":         data.get("person_id"),
+        "search_name":       search_name,
+        "search_first":      data.get("first_name") or "",
+        "search_last":       data.get("last_name") or "",
+        "search_birth_year": str(data.get("birth_year") or ""),
+        "search_death_year": str(data.get("death_year") or ""),
+        "search_state":      data.get("state") or "NC",
+        "records":           records,
+    }
+    _w_status, w_result = heir_write_ancestry(write_payload)
+
+    # Rank records by relevance before capping — prevents correct records buried
+    # deep in Ancestry's natural sort order from being invisible to the LLM.
+    # Scoring: +3 state/location match, +2 death year ±2, +1 birth year ±5.
+    target_death_year = int(data.get("death_year") or 0)
+    target_birth_year = int(data.get("birth_year") or 0)
+    target_state      = (data.get("state") or "").strip().lower()
+
+    _STATE_ALIASES = {"nc": ["nc", "north carolina"], "sc": ["sc", "south carolina"]}
+    state_terms = _STATE_ALIASES.get(target_state, [target_state]) if target_state else []
+
+    def _relevance(r: dict) -> int:
+        score = 0
+        loc = (r.get("death_location") or "").lower()
+        if state_terms and any(t in loc for t in state_terms):
+            score += 3
+        if target_death_year:
+            try:
+                ry = int(str(r.get("dod") or "")[:4])
+                if abs(ry - target_death_year) <= 2:
+                    score += 2
+            except (ValueError, TypeError):
+                pass
+        if target_birth_year:
+            try:
+                ry = int(str(r.get("dob") or "")[:4])
+                if abs(ry - target_birth_year) <= 5:
+                    score += 1
+            except (ValueError, TypeError):
+                pass
+        return score
+
+    ranked = sorted(records, key=_relevance, reverse=True)
+
+    summary = []
+    for r in ranked[:50]:
+        summary.append({
+            "record_id":     r.get("record_id"),
+            "collection_id": r.get("collection_id"),
+            "collection":    r.get("collection"),
+            "person_name":   r.get("person_name"),
+            "dob":           r.get("dob"),
+            "dod":           r.get("dod"),
+            "death_location": r.get("death_location"),
+            "spouse_name":   r.get("spouse_name"),
+            "children":      r.get("children") or [],
+            "parents":       r.get("parents") or [],
+            "source_url":    r.get("source_url") or (
+                f"https://www.ancestry.com/search/collections/{r['collection_id']}/records/{r['record_id']}"
+                if r.get("collection_id") and r.get("record_id") else ""
+            ),
+        })
+
+    return 200, {
+        "result_count":    result.get("result_count"),
+        "returned":        result.get("returned"),
+        "saved":           w_result.get("saved", 0) if isinstance(w_result, dict) else 0,
+        "records_summary": summary,
+        "search_name":     search_name,
+    }
+
+
+def _ancestry_record_and_save(data: dict) -> tuple[int, dict]:
+    """
+    Fetch a single Ancestry record's detail page and persist it.
+
+    Required: session_id, property_id, record_id (or full URL)
+    Returns:  { record: {...}, saved: 1 }
+    """
+    session_id  = data.get("session_id")
+    property_id = data.get("property_id")
+    record_id   = (data.get("record_id") or "").strip()
+    if not session_id or not property_id:
+        return 400, {"error": "session_id and property_id are required"}
+    if not record_id:
+        return 400, {"error": "record_id is required"}
+
+    result = ancestry_record(record_id)
+    if "error" in result:
+        return 200, result
+
+    records = result.get("records") or []
+    if records:
+        heir_write_ancestry({
+            "session_id":   session_id,
+            "property_id":  property_id,
+            "person_id":    data.get("person_id"),
+            "search_name":  records[0].get("person_name") or record_id,
+            "search_state": data.get("state") or "NC",
+            "records":      records,
+        })
+
+    return 200, {
+        "record": records[0] if records else None,
+        "saved":  len(records),
+    }
+
+
+def _ancestry_household(data: dict) -> tuple[int, dict]:
+    """
+    Return all members of a census household given any record URL from that household.
+
+    Required: record_url (Ancestry census record URL, e.g. /search/collections/2442/records/...)
+    Returns:  { result_count, records: [{person_name, relationship_to_head, dob, ...}] }
+
+    Use when a person's children cannot be found via obituary — census household
+    members include all children living at home at the time of the census.
+    """
+    record_url = (data.get("record_url") or "").strip()
+    if not record_url:
+        return 400, {"error": "record_url is required"}
+    return 200, ancestry_household(record_url)
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +770,7 @@ _ROUTES: dict[str, callable] = {
     "/court/nc/session-status":       _nc_court_session_status,
     "/court/nc/refresh-session":      _nc_court_refresh_session,
     "/court/nc/captcha-status":       _nc_captcha_status,
+    "/court/nc/pull-document":         _nc_pull_document,
     "/court/nc/search": _nc_court_search,
     "/court/nc/register_of_actions": _nc_court_roa,
     "/fetch-page":                               _fetch_page,
@@ -611,9 +811,32 @@ _ROUTES: dict[str, callable] = {
     "/heir/claim-fa-trigger":                    lambda d: heir_claim_fa_trigger(d),
     "/heir/write-ancestry":                      lambda d: heir_write_ancestry(d),
     "/heir/ancestry-records":                    lambda d: heir_load_ancestry_records(d),
+    "/heir/recover-stuck":                       lambda d: heir_recover_stuck(d),
+    "/heir/queue-recover":                       lambda d: heir_queue_recover(d),
+    # v2 voter + deed finding storage
+    "/heir/write-voter":                         lambda d: heir_write_voter(d),
+    "/heir/voter-records":                       lambda d: heir_load_voter(d),
+    "/heir/write-deed-finding":                  lambda d: heir_write_deed_finding(d),
+    "/heir/write-court-findings":                lambda d: heir_write_court_findings(d),
+    "/heir/court-findings":                      lambda d: heir_load_court_findings(d),
+    # v3 progressive DB writes and person lookup
+    "/heir/upsert-person":                       lambda d: heir_upsert_person(d),
+    "/heir/load-person":                         lambda d: heir_load_person(d),
     # Ancestry.com genealogy search
     "/ancestry/search":                          lambda d: _ancestry_search(d),
     "/ancestry/record":                          lambda d: _ancestry_record(d),
+    "/ancestry/search-and-save":                 lambda d: _ancestry_search_and_save(d),
+    "/ancestry/record-and-save":                 lambda d: _ancestry_record_and_save(d),
+    "/ancestry/household":                       lambda d: _ancestry_household(d),
+    # NC Voter Registration — living status + married name discovery
+    "/voter/nc/lookup":                          lambda d: (200, ncvoter_lookup(
+        last_name=d.get("last_name",""),
+        first_name=d.get("first_name",""),
+        middle_initial=d.get("middle_initial", d.get("middle_name",""))[:1],
+        birth_year=d.get("birth_year",""),
+        county=d.get("county",""),
+        include_removed=bool(d.get("include_removed", False)),
+    )),
 }
 
 

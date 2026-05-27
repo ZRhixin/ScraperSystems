@@ -9,7 +9,7 @@ invalidates the session.
 import json
 
 from . import session as sess
-from .search import search_person as _search, get_record as _record
+from .search import search_person as _search, get_record as _record, get_household_members as _household
 
 
 def _require_session() -> dict | None:
@@ -46,14 +46,15 @@ def search(
     mother: str = "",
     name_x: str = "1_1",
     count: int = 50,
+    collection_id: str = "",
 ) -> dict:
     """
     Search Ancestry for a person.
     Returns { result_count, records: [...] } or { error, message }.
     Auto-logs in if no valid session exists.
     """
-    if not first_name and not last_name:
-        return {"error": "bad_request", "message": "first_name or last_name is required"}
+    if not first_name and not last_name and not mother and not father:
+        return {"error": "bad_request", "message": "first_name, last_name, mother, or father is required"}
 
     err = _require_session()
     if err:
@@ -75,7 +76,45 @@ def search(
         mother=mother.strip(),
         name_x=name_x.strip(),
         count=count,
+        collection_id=collection_id.strip(),
     )
+
+
+def search_paged(
+    max_pages: int = 3,
+    page_size: int = 20,
+    **kwargs,
+) -> dict:
+    """
+    Paginate through Ancestry search results, up to max_pages pages.
+    Stops early if a page returns fewer records than page_size (last page).
+    Returns combined { result_count, returned, records }.
+    """
+    err = _require_session()
+    if err:
+        return err
+
+    all_records = []
+    result_count = 0
+
+    for page in range(max_pages):
+        offset = page * page_size
+        result = _search(offset=offset, count=page_size, **kwargs)
+        if "error" in result:
+            if page == 0:
+                return result
+            break
+        result_count = result.get("result_count", result_count)
+        page_records = result.get("records", [])
+        all_records.extend(page_records)
+        if len(page_records) < page_size:
+            break
+
+    return {
+        "result_count": result_count,
+        "returned": len(all_records),
+        "records": all_records,
+    }
 
 
 def record_detail(record_id: str) -> dict:
@@ -92,6 +131,19 @@ def record_detail(record_id: str) -> dict:
         return err
 
     return _record(record_id.strip())
+
+
+def household_members(record_url: str) -> dict:
+    """
+    Given a census record URL, return all members of the same household.
+    Uses the 'View others on page' link embedded in the census record page.
+    """
+    if not record_url:
+        return {"error": "bad_request", "message": "record_url is required"}
+    err = _require_session()
+    if err:
+        return err
+    return _household(record_url.strip())
 
 
 def session_status() -> dict:
