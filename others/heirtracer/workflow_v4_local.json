@@ -1267,7 +1267,7 @@
         3600
       ],
       "parameters": {
-        "respondWith": "lastNode",
+        "respondWith": "lastEntryJson",
         "options": {}
       }
     },
@@ -2094,7 +2094,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "2cfa4196-635a-4a14-9b2e-556b7dfcb076",
+  "versionId": "6b60c443-bfe5-4c94-8880-74ec795d3dfb",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },
