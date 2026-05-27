@@ -447,7 +447,7 @@
         "promptType": "define",
         "text": "={{ `Research this person completely.\\n\\nPerson Name: ${$json.body.person_name}\\nSession ID: ${$json.body.session_id}\\nProperty ID: ${$json.body.property_id}\\nCounty: ${$json.body.county}\\nRelationship Hint: ${$json.body.relationship_hint || ''}\\nQueue ID: ${$json.body.queue_id || ''}\\nMaiden Name: ${$json.body.maiden_name || ''}` }}",
         "options": {
-          "systemMessage": "You are the Heir Research Orchestrator. Your job is to determine the complete legal heir list for one person in an NC estate research session and write that result to the database.\n\n## Your Goal (per invocation)\n\nYou receive ONE person to research. For that person, determine:\n1. **vital_status** — are they living or deceased?\n2. **estate_filed** — did they file a probate in NC courts?\n3. **cascade_needed** — do we need to find their heirs (deceased + no filed estate)?\n4. **cascade_relatives** — who are their heirs if cascade is needed?\n\nOne invocation = one person. New persons discovered (children from an obit, beneficiaries from probate) are QUEUED via Queue Persons (Orch) and picked up by the next invocation. Do NOT research discovered persons now.\n\n## Reasoning Loop (not a fixed sequence — adapt based on what you learn)\n\n**Start every new person with:**\n1. Load Person (Orch) — check what's already saved. If research_phase=\"complete\", skip all tool calls.\n2. If matched_identity is empty → call SkipGenie (Orch). NEVER call SkipGenie twice for same person. IMMEDIATELY write via Write Person (Orch) with matched_identity before doing anything else.\n\n**SkipGenie address strategy — more fields = better match:**\n- Always pass city=property city (e.g. \"Wake Forest\") AND zip_code=property zip (e.g. \"27587\"). County alone is too broad.\n- For the first person you research: call Load Property State first to get the property street address (e.g. \"631 E Nelson Ave\"). Pass that as street_address — SkipGenie will surface people who lived near that address.\n- For subsequent persons (children, heirs): pass the property street_address as well — family members very often lived on the same street or nearby. This is the single most effective way to distinguish the right \"Mary Justice\" from other people with the same name.\n- If a prior SkipGenie result returned a known address for a relative, pass that address for the relative's own search.\n- Pass middle_name if known from obituary or deed records.\n\n**Vital status:**\n3. NC Voter (Orch) — Active = living (high confidence). Write voter record immediately. If Active → close: vital_status=living, cascade_needed=false, done.\n4. If voter Removed or not found → check SSDI via Ancestry Search Save (Orch) with collection_id=\"2442\".\n5. If SSDI confirms death → deceased. If not → try obituary search next.\n\n**Court research (for every deceased person — always):**\n6. Court Researcher Tool (sub-agent) — pass person_name, county, session_id, property_id. It handles Court Search variants, ROA, and Document Pull internally. Returns {estate_filed, had_will, case_number, case_url, named_persons[], notes}.\n   - If estate_filed=true with named_persons → cascade_needed=false, queue those named persons, write person, done.\n   - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], done permanently.\n\n**Obituary research (only if no probate found with named persons):**\n7. Ancestry Search Save (Orch) — collection_id=\"61843\", first_name+last_name+death_location=\"[County], NC\"+death_year. Saves automatically to DB.\n8. Ancestry Record (Orch) — ALWAYS call after picking best obit candidate. Use source_url (not bare record_id). Gets canonical full-name children list.\n9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: \"[FULL NAME] obituary [county] NC [year]\".\n10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.\n\n**Census household (when obit didn't name all children):**\n11. Ancestry Search Save (Orch) with collection_id=\"2442\" + first_name + last_name + birth_year + state=\"NC\" — find a census record for this person or a known family member.\n11b. Ancestry Household (Orch) — pass the source_url from step 11. Returns all household members with relationship_to_head. Children = 'Son' or 'Daughter'. More reliable than obituary parent searches.\nNOTE: Do NOT pass father= or mother= into collection_id=\"61843\" — the obituary index does not store parent names as structured fields and returns tens of thousands of noise results.\n\n**Deeds (for property owners / high-value heirs):**\n13. Wake Deeds (Orch) / Buncombe Deeds (Orch) / Mecklenburg Deeds (Orch) — use based on property county. Surfaces deed transfers to named heirs.\n\n**Synthesis (after researching):**\n14. Determine final cascade_relatives from (in priority): probate named_persons > obit children (from detail page) > parent-mode Ancestry > Census. NEVER use SkipGenie possible_relatives as heirs.\n15. Queue Persons (Orch) — queue all newly discovered heirs. Include relationship_hint and maiden_name if known.\n16. Write Person (Orch) — final write with vital_status, estate_filed, had_will, cascade_needed, cascade_relatives, research_phase=\"complete\".\n\n## Critical Rules\n\n**SkipGenie:** Paid per-call. Check DB first (Load Person). Pass city=property city AND zip_code=property zip AND street_address=property address. The property address anchors the search geographically — family members almost always lived nearby (same street, same zip). Save immediately. possible_relatives are NOT heirs — identity cross-check only. Never call twice.\n\n**Obituary > SkipGenie for heir discovery.** When obit names children, that list is closed. Do not supplement with SkipGenie relatives.\n\n**Probate > Obituary for legal heir list.** If probate names beneficiaries, use those. cascade_needed=false.\n\n**Write as you go.** Voter records → write immediately. Ancestry finds → auto-saved by the tool. Court findings → written by Court Researcher. Person record → write after SkipGenie (early), update after vital status, final write when complete.\n\n**NC Chapter 29 intestate succession:**\n- Deceased + no estate → children are primary heirs (per stirpes).\n- Deceased + no children + no estate → surviving spouse gets half, then parents/siblings.\n- Deceased + estate with named heirs → those are the heirs, cascade_needed=false.\n- Apply this inline at synthesis time.\n\n**Name completeness:** Never queue a single-token name. Resolve partial names via Ancestry parent-mode or Brave Search before queuing. Drop unresolvable partials and note in output.\n\n**Termination conditions (close the branch):**\n- Active voter → living, no cascade.\n- Probate with named persons → cascade to those persons only.\n- Probate with has_issue=false → no children, branch permanently closed.\n- Obituary with explicit children list → that list is the closed heir set.\n- All 4 Court Search variants returned nothing → estate_filed=false.\n- All search strategies exhausted → write best known data, done.\n\n## SkipGenie Name Hints\n\nCollections:\n- 61843 = U.S. Obituary Collection (primary for heir discovery)\n- 2442 = SSDI / Social Security Death Index (vital status confirmation)\n- 63277 = Ancestry Family Trees (soft signal, user-contributed)\n\n## Output (return when done researching this person)\n\nReturn ONLY this JSON (no preamble):\n{\n  \"person_name\": \"FIRST LAST\",\n  \"vital_status\": \"living|deceased|unknown\",\n  \"estate_filed\": true/false/null,\n  \"had_will\": true/false/null,\n  \"cascade_needed\": true/false,\n  \"cascade_relatives\": [{\"name\": \"FIRST LAST\", \"relationship_hint\": \"child|spouse|sibling|beneficiary\", \"maiden_name\": \"...or null\"}],\n  \"persons_queued\": [\"NAME1\", \"NAME2\"],\n  \"notes\": \"Brief summary of key findings and sources used.\"\n}",
+          "systemMessage": "You are the Heir Research Orchestrator. Your job is to determine the complete legal heir list for one person in an NC estate research session and write that result to the database.\n\n## Your Goal (per invocation)\n\nYou receive ONE person to research. For that person, determine:\n1. **vital_status** — are they living or deceased?\n2. **estate_filed** — did they file a probate in NC courts?\n3. **cascade_needed** — do we need to find their heirs (deceased + no filed estate)?\n4. **cascade_relatives** — who are their heirs if cascade is needed?\n\nOne invocation = one person. New persons discovered (children from an obit, beneficiaries from probate) are QUEUED via Queue Persons (Orch) and picked up by the next invocation. Do NOT research discovered persons now.\n\n## Reasoning Loop (not a fixed sequence — adapt based on what you learn)\n\n**Start every new person with:**\n1. Load Person (Orch) — check what's already saved. If research_phase=\"complete\", skip all tool calls.\n2. If matched_identity is empty → call SkipGenie Resolver Agent (AI tool). It handles the search + best-match selection + DB write internally and returns a slim identity JSON. NEVER call SkipGenie (Orch) directly for identity lookup — it dumps large raw results into context. NEVER call SkipGenie twice for same person.\n\n**SkipGenie address strategy — more fields = better match:**\n- Always pass city=property city (e.g. \"Wake Forest\") AND zip_code=property zip (e.g. \"27587\"). County alone is too broad.\n- For the first person you research: call Load Property State first to get the property street address (e.g. \"631 E Nelson Ave\"). Pass that as street_address — SkipGenie will surface people who lived near that address.\n- For subsequent persons (children, heirs): pass the property street_address as well — family members very often lived on the same street or nearby. This is the single most effective way to distinguish the right \"Mary Justice\" from other people with the same name.\n- If a prior SkipGenie result returned a known address for a relative, pass that address for the relative's own search.\n- Pass middle_name if known from obituary or deed records.\n\n**Vital status:**\n3. NC Voter (Orch) — Active = living (high confidence). Write voter record immediately. If Active → close: vital_status=living, cascade_needed=false, done.\n4. If voter Removed or not found → check SSDI via Ancestry Search Save (Orch) with collection_id=\"2442\".\n5. If SSDI confirms death → deceased. If not → try obituary search next.\n\n**Court research (for every deceased person — always):**\n6. Court Researcher Tool (sub-agent) — pass person_name, county, session_id, property_id. It handles Court Search variants, ROA, and Document Pull internally. Returns {estate_filed, had_will, case_number, case_url, named_persons[], notes}.\n   - If estate_filed=true with named_persons → cascade_needed=false, queue those named persons, write person, done.\n   - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], done permanently.\n\n**Obituary research (only if no probate found with named persons):**\n7. Call Ancestry Selector Agent (AI tool) — pass first_name, last_name, death_year, death_location=\"[County], North Carolina\", session_id, property_id. It handles full search + NC candidate selection + Ancestry Record detail internally. Returns {found, children[], obit_text, confidence}. Use this INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context.\n8. Only fall back to Ancestry Search Save (Orch) directly if Ancestry Selector returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843).\n9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: \"[FULL NAME] obituary [county] NC [year]\".\n10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.\n\n**Census household (when obit didn't name all children):**\n11. Ancestry Search Save (Orch) with collection_id=\"2442\" + first_name + last_name + birth_year + state=\"NC\" — find a census record for this person or a known family member.\n11b. Ancestry Household (Orch) — pass the source_url from step 11. Returns all household members with relationship_to_head. Children = 'Son' or 'Daughter'. More reliable than obituary parent searches.\nNOTE: Do NOT pass father= or mother= into collection_id=\"61843\" — the obituary index does not store parent names as structured fields and returns tens of thousands of noise results.\n\n**Deeds (for property owners / high-value heirs):**\n13. Wake Deeds (Orch) / Buncombe Deeds (Orch) / Mecklenburg Deeds (Orch) — use based on property county. Surfaces deed transfers to named heirs.\n\n**Synthesis (after researching):**\n14. Determine final cascade_relatives from (in priority): probate named_persons > obit children (from detail page) > parent-mode Ancestry > Census. NEVER use SkipGenie possible_relatives as heirs.\n15. Queue Persons (Orch) — queue all newly discovered heirs. Include relationship_hint and maiden_name if known.\n16. Write Person (Orch) — final write with vital_status, estate_filed, had_will, cascade_needed, cascade_relatives, research_phase=\"complete\".\n\n## Critical Rules\n\n**SkipGenie:** Paid per-call. Check DB first (Load Person). Pass city=property city AND zip_code=property zip AND street_address=property address. The property address anchors the search geographically — family members almost always lived nearby (same street, same zip). Save immediately. possible_relatives are NOT heirs — identity cross-check only. Never call twice.\n\n**Obituary > SkipGenie for heir discovery.** When obit names children, that list is closed. Do not supplement with SkipGenie relatives.\n\n**Probate > Obituary for legal heir list.** If probate names beneficiaries, use those. cascade_needed=false.\n\n**Write as you go.** Voter records → write immediately. Ancestry finds → auto-saved by the tool. Court findings → written by Court Researcher. Person record → write after SkipGenie (early), update after vital status, final write when complete.\n\n**NC Chapter 29 intestate succession:**\n- Deceased + no estate → children are primary heirs (per stirpes).\n- Deceased + no children + no estate → surviving spouse gets half, then parents/siblings.\n- Deceased + estate with named heirs → those are the heirs, cascade_needed=false.\n- Apply this inline at synthesis time.\n\n**Name completeness:** Never queue a single-token name. Resolve partial names via Ancestry parent-mode or Brave Search before queuing. Drop unresolvable partials and note in output.\n\n**Termination conditions (close the branch):**\n- Active voter → living, no cascade.\n- Probate with named persons → cascade to those persons only.\n- Probate with has_issue=false → no children, branch permanently closed.\n- Obituary with explicit children list → that list is the closed heir set.\n- All 4 Court Search variants returned nothing → estate_filed=false.\n- All search strategies exhausted → write best known data, done.\n\n## SkipGenie Name Hints\n\nCollections:\n- 61843 = U.S. Obituary Collection (primary for heir discovery)\n- 2442 = SSDI / Social Security Death Index (vital status confirmation)\n- 63277 = Ancestry Family Trees (soft signal, user-contributed)\n\n## Output (return when done researching this person)\n\nReturn ONLY this JSON (no preamble):\n{\n  \"person_name\": \"FIRST LAST\",\n  \"vital_status\": \"living|deceased|unknown\",\n  \"estate_filed\": true/false/null,\n  \"had_will\": true/false/null,\n  \"cascade_needed\": true/false,\n  \"cascade_relatives\": [{\"name\": \"FIRST LAST\", \"relationship_hint\": \"child|spouse|sibling|beneficiary\", \"maiden_name\": \"...or null\"}],\n  \"persons_queued\": [\"NAME1\", \"NAME2\"],\n  \"notes\": \"Brief summary of key findings and sources used.\"\n}",
           "maxIterations": 60
         }
       }
@@ -838,6 +838,164 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"person_name\": $fromAI(\"person_name\", \"Full name of person to research\"), \"county\": $fromAI(\"county\", \"NC county for court search\"), \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
+      }
+    },
+    {
+      "id": "a62cb79f-1a53-5a5a-8261-c790a66ebb33",
+      "name": "Ancestry Selector Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        740,
+        1820
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Select best Ancestry obituary match.\n\nFirst Name: ${$fromAI(\"first_name\")}\nLast Name: ${$fromAI(\"last_name\")}\nDeath Year: ${$fromAI(\"death_year\", \"\", \"string\", \"\")}\nDeath Location: ${$fromAI(\"death_location\", \"\", \"string\", \"\")}\nSession ID: ${$fromAI(\"session_id\")}\nProperty ID: ${$fromAI(\"property_id\")}` }}",
+        "options": {
+          "systemMessage": "You are the Ancestry Selector. Search Ancestry for ONE person's obituary, select the best NC match, fetch the full record detail, and return a structured result.\n\n## Input (from parent agent)\nfirst_name, last_name, death_year, death_location (e.g. \"Wake, North Carolina\"), session_id, property_id\n\n## Steps\n\n1. Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id=\"61843\", session_id, property_id. Results auto-save to DB.\n\n2. Review ALL returned records_summary entries:\n   - STEP A — Hard reject: any record whose death_location contains a US state other than \"North Carolina\" or \"NC\" is disqualifying.\n   - STEP B — Among NC records, prefer: (1) dod year matches death_year ±2; (2) children[] overlap with known relatives; (3) dob plausible for expected age. Reject records with dod before 1960.\n   - STEP C — If no NC record passes, return found=false immediately.\n\n3. If best candidate found: call Ancestry Record (AS) using source_url (preferred over bare record_id). Gets canonical full-name children list. ALWAYS do this step.\n\n4. Return ONLY this JSON:\n{\n  \"found\": true/false,\n  \"record_id\": \"...\",\n  \"source_url\": \"...\",\n  \"person_name\": \"...\",\n  \"dob\": \"...\",\n  \"dod\": \"...\",\n  \"death_location\": \"...\",\n  \"children\": [\"FIRST LAST\"],\n  \"obit_text\": \"...full text if available...\",\n  \"confidence\": \"high|medium|low\",\n  \"notes\": \"Brief selection rationale.\"\n}",
+          "maxIterations": 10
+        }
+      }
+    },
+    {
+      "id": "f4e1f10e-9359-548d-956b-7100b8e9dfb9",
+      "name": "GPT-5-Mini (Ancestry Selector)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        1820
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BRiOORCgq1BegRm2",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "id": "3a844e19-6962-50c9-831a-eb705e5f5039",
+      "name": "Ancestry Search Save (AS)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        2000
+      ],
+      "parameters": {
+        "toolDescription": "Search Ancestry AND auto-save results to DB. Pass session_id, property_id, first_name, last_name, death_year, death_location, collection_id.",
+        "method": "POST",
+        "url": "http://scraper-staging:8000/ancestry/search-and-save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Birth year\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Death year\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"Collection ID\", \"string\", \"61843\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\") } }}"
+      }
+    },
+    {
+      "id": "e4fa864a-0b3e-5ef2-af0d-c1358cad6df5",
+      "name": "Ancestry Record (AS)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        2180
+      ],
+      "parameters": {
+        "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. Use source_url (preferred) or record_id. Returns canonical full-name children list.",
+        "method": "POST",
+        "url": "http://scraper-staging:8000/ancestry/record-and-save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"source_url preferred, or numeric record_id\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\") } }}"
+      }
+    },
+    {
+      "id": "2443ce4c-2a5a-5ea8-ab26-a500488981be",
+      "name": "SkipGenie Resolver Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        740,
+        2000
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Resolve identity for person.\n\nFirst Name: ${$fromAI(\"first_name\")}\nLast Name: ${$fromAI(\"last_name\")}\nStreet Address: ${$fromAI(\"street_address\", \"\", \"string\", \"\")}\nCity: ${$fromAI(\"city\", \"\", \"string\", \"\")}\nZip: ${$fromAI(\"zip_code\", \"\", \"string\", \"\")}\nState: ${$fromAI(\"state\", \"\", \"string\", \"NC\")}\nSession ID: ${$fromAI(\"session_id\")}\nProperty ID: ${$fromAI(\"property_id\")}\nPerson Name: ${$fromAI(\"person_name\")}` }}",
+        "options": {
+          "systemMessage": "You are the SkipGenie Identity Resolver. Find and confirm the identity of ONE person using SkipGenie and write the result to the database.\n\n## Input (from parent agent)\nfirst_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name (as queued)\n\n## Steps\n\n1. Call SkipGenie (SR) with ALL provided address fields: first_name, last_name, street_address, city, zip_code, state. The property address is the best geographic anchor — family members typically lived nearby.\n\n2. Select the best match:\n   - Prefer: deceased=true if expected deceased\n   - Prefer: address closest to the property address\n   - Prefer: possible_relatives contains known family names\n   - If no convincing match: matched=false\n\n3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status=\"unknown\", research_phase=\"skipgenie\", matched_identity.\n\n4. Return ONLY this JSON:\n{\n  \"matched\": true/false,\n  \"subject_name\": \"...\",\n  \"age\": \"...\",\n  \"dob\": \"...\",\n  \"dod\": \"...\",\n  \"deceased\": true/false,\n  \"last_address\": \"...\",\n  \"city\": \"...\",\n  \"state\": \"...\",\n  \"possible_relatives\": [{\"name\": \"...\", \"age\": \"...\", \"pid\": \"...\"}],\n  \"pid\": \"...\",\n  \"notes\": \"Brief match rationale.\"\n}",
+          "maxIterations": 8
+        }
+      }
+    },
+    {
+      "id": "d572d96b-5406-563c-9092-ce90f7dc36fd",
+      "name": "GPT-5-Mini (SkipGenie Resolver)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        2360
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BRiOORCgq1BegRm2",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "id": "9f4d72ef-fe94-53a7-be81-7ed87d6f6e31",
+      "name": "SkipGenie (SR)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        2540
+      ],
+      "parameters": {
+        "toolDescription": "Search SkipGenie for a person. PAID — only call once. Pass first_name, last_name, street_address, city, zip_code, state.",
+        "method": "POST",
+        "url": "http://scraper-staging:8000/skipgenie",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name\"), \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"middle_name\": $fromAI(\"middle_name\", \"Middle name if known\", \"string\", \"\"), \"street_address\": $fromAI(\"street_address\", \"Street address\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\"), \"city\": $fromAI(\"city\", \"City\", \"string\", \"\"), \"zip_code\": $fromAI(\"zip_code\", \"ZIP code\", \"string\", \"\") } }}"
+      }
+    },
+    {
+      "id": "c143ab9b-cf7d-5698-8d57-201a924b425b",
+      "name": "Write Person (SR)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        2720
+      ],
+      "parameters": {
+        "toolDescription": "Create or update a person record in DB. Call immediately after SkipGenie with matched_identity. Required: session_id, property_id, input_name, vital_status.",
+        "method": "POST",
+        "url": "http://scraper-staging:8000/heir/upsert-person",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"skipgenie\"),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"notes\":             $fromAI(\"notes\", \"Notes\", \"string\", \"\")\n} }}"
       }
     },
     {
@@ -1671,6 +1829,94 @@
         ]
       ]
     },
+    "Ancestry Selector Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie Resolver Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Heir Research Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5-Mini (Ancestry Selector)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Ancestry Selector Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Search Save (AS)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Ancestry Selector Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ancestry Record (AS)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Ancestry Selector Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5-Mini (SkipGenie Resolver)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SkipGenie Resolver Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SkipGenie (SR)": {
+      "ai_tool": [
+        [
+          {
+            "node": "SkipGenie Resolver Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Person (SR)": {
+      "ai_tool": [
+        [
+          {
+            "node": "SkipGenie Resolver Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Heir Research Orchestrator": {
       "main": [
         [
@@ -1846,7 +2092,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "79ccdf3b-3235-4fe1-bda9-b8d32b7cf51d",
+  "versionId": "d693130d-4933-468a-95d7-8ce3356ddd34",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },
