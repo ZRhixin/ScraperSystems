@@ -1309,6 +1309,17 @@ Call Register of Actions (CR) with the case_url. Key events to note:
 - "Letters of Administration" → had_will=false (intestate)
 - "Deed of Distribution" → real property transferred — grantees may be named heirs
 
+**CRITICAL — Extract party roles from ROA immediately:**
+The ROA lists parties with roles. Extract every person who appears as:
+- **Beneficiary** → named_persons entry, relationship_hint="beneficiary" (this IS an heir)
+- **Petitioner** → named_persons entry, relationship_hint="petitioner"
+- **Affiant** (who is also Beneficiary) → named_persons entry, relationship_hint="beneficiary"
+- **Personal Representative / Administrator / Executor** → named_persons entry, relationship_hint="executor"
+
+Also extract the party's address if shown (e.g. "611 PEYTON ST APT 10, RALEIGH, NC 27610") and include it in the named_persons entry.
+
+For Small Estate (SE) cases: the Affiant/Beneficiary IS the heir — always include them in named_persons even if no PDFs exist.
+
 If roa_unavailable=true (WAF block): skip, use case data from Court Search.
 
 **Step 3 — Court Document Pull (if estate case found)**
@@ -1331,8 +1342,8 @@ Update the court findings record with named_persons and family_tree. Required: s
   "had_will": true/false/null,
   "case_number": "...",
   "case_url": "...",
-  "named_persons": [{"name": "FIRST LAST", "role": "beneficiary|heir|executor", "has_issue": true/false/null}],
-  "notes": "Brief summary: case type, date filed, key document findings."
+  "named_persons": [{"name": "FIRST LAST", "relationship_hint": "beneficiary|heir|executor|petitioner", "address": "street, city, state zip or null", "has_issue": true/false/null}],
+  "notes": "Brief summary: case type, date filed, party names, key document findings."
 }"""
 
 court_researcher_agent = agent_node(
