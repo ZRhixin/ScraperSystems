@@ -1354,6 +1354,12 @@ court_researcher_model = gpt_model("GPT-5-Mini (Court Researcher)", NID["Court R
 court_search_cr = v3node("Court Search")
 court_search_cr["id"]   = NID["Court Search (CR)"]
 court_search_cr["name"] = "Court Search (CR)"
+# Override body format to jsonBody — bodyParameters $fromAI() pattern is unreliable in agentTool nodes
+court_search_cr["parameters"].update({
+    "specifyBody": "json",
+    "jsonBody": '={{ { "name": $fromAI("name", "Person name in LAST, FIRST format (e.g. HAYES, LYDIA)"), "county": $fromAI("county", "County", "string", null) } }}',
+})
+court_search_cr["parameters"].pop("bodyParameters", None)
 
 reg_actions_cr = v3node("Register of Actions")
 reg_actions_cr["id"]   = NID["Register of Actions (CR)"]
