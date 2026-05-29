@@ -23,10 +23,12 @@ from pathlib import Path
 
 from curl_cffi import requests as cffi_requests
 
-_TOKEN_FILE = Path(__file__).parent / "session_cookies.json"
+# Prefer /data/court_session (Docker volume mount) so cookies survive container restarts.
+# Falls back to the package directory for local dev.
+_TOKEN_FILE = Path(os.environ.get("COURT_SESSION_DIR", Path(__file__).parent)) / "session_cookies.json"
 _PORTAL_URL = "https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29"
 _APP_URL    = "https://portal-nc.tylertech.cloud/app/RegisterOfActions/"
-_TOKEN_MAX_AGE_HOURS = 48  # aws-waf-token is valid for days
+_TOKEN_MAX_AGE_HOURS = 168  # aws-waf-token lasts ~7 days; refresh weekly
 
 _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
