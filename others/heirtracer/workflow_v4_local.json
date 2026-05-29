@@ -356,6 +356,7 @@
         "toolDescription": "Fetch all members of the same census household given any Ancestry census record URL. Use after step 4d when you have a census source_url — returns all household members with relationship_to_head. Children appear as 'Son' or 'Daughter'. More reliable than obituary parent searches for finding all siblings.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/ancestry/household",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"record_url\": $fromAI(\"record_url\", \"Ancestry census record URL from step 4d search result source_url field\") } }}"
@@ -508,6 +509,7 @@
         "toolDescription": "Look up NC voter registration. Pass last_name, first_name, and county. IMPORTANT: verify the returned name matches the person searched — first name must match. If name does not match, treat as not found regardless of status. If name matches: Active = living (high confidence), Removed = investigate further. ALWAYS write result via Write Voter Record (Orch) immediately, even if not found.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/voter/nc/lookup",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"first_name\": $fromAI(\"first_name\", \"First name\"), \"county\": $fromAI(\"county\", \"County if known\", \"string\", null) } }}"
@@ -526,6 +528,7 @@
         "toolDescription": "Search Ancestry AND auto-save results to DB. REQUIRED: session_id, property_id. Three usage modes: (1) OBITUARY: first_name+last_name+death_year+death_location+collection_id='61843' — finds person's own obit. After picking best hit, call Ancestry Record (Orch) for the detail page — it has the full children/survivors list. (2) CENSUS: first_name+last_name+birth_year+state='NC'+collection_id='2442' — find a census record for this person. Pass the returned source_url to Ancestry Household (Orch) to get all household members (children listed as Son/Daughter). (3) SSDI: first_name+last_name+death_year+collection_id='2442' — confirm death date and last residence. WARNING: passing father= or mother= into collection_id='61843' does NOT reliably find children. The obituary index does not store parent names as structured fields — use Ancestry Household instead. Collections: 61843=obituaries, 2442=census/SSDI, 63277=family trees.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name. Empty for parent-mode.\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name.\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Estimated birth year\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Estimated death year\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location e.g. 'Wake, North Carolina'\", \"string\", \"\"), \"mother\": $fromAI(\"mother\", \"Parent-mode: full name as mother. Empty for direct.\", \"string\", \"\"), \"father\": $fromAI(\"father\", \"Parent-mode: full name as father. Empty for direct.\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"e.g. 61843 (obits), 2442 (SSDI/census), 63277 (trees)\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State e.g. NC\", \"string\", \"NC\"), \"name_x\": $fromAI(\"name_x\", \"Exact-match flags, default 1_1\", \"string\", \"1_1\") } }}"
@@ -544,6 +547,7 @@
         "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. ALWAYS call after selecting best obit candidate from Ancestry Search Save. REQUIRED: session_id, property_id, record_id (source_url preferred — bare numeric ID 404s for Newspapers.com). Detail page has canonical full-name children list (e.g. 'Mary Justice' not 'Mary').",
         "method": "POST",
         "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"Ancestry record_id (source_url preferred) or numeric ID\"), \"state\": $fromAI(\"state\", \"State e.g. NC\", \"string\", \"NC\") } }}"
@@ -663,6 +667,7 @@
         "toolDescription": "Fetch all members of the same census household given any Ancestry census record URL. Use when a person's children are not found in their obituary or probate documents. How to use: first call Ancestry Search Save (Orch) with collection_id='2442' to find a census record for this person or a confirmed family member — then pass the returned source_url here. Returns all household members with relationship_to_head (Son, Daughter, Wife, Head, etc.). Children appear as 'Son' or 'Daughter'. This is the most reliable way to find children not mentioned in an obituary — census records capture everyone living in the household.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/ancestry/household",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"record_url\": $fromAI(\"record_url\", \"Ancestry census record URL from a prior search result (source_url field)\") } }}"
@@ -681,6 +686,7 @@
         "toolDescription": "Load full property record including street address, city, zip, and county. Call ONCE at the start of a session before your first SkipGenie call. Use property.address.street, property.address.city, property.address.zip as SkipGenie inputs. Family members of the deceased almost always lived nearby — the property address is the best geographic anchor for finding ANY person in this family, not just the root decedent. Pass property_id to retrieve.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/investigate/property-state",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
@@ -699,6 +705,7 @@
         "toolDescription": "Load person's existing research record from DB. Call FIRST before any external API to avoid duplicate paid calls. If research_phase='complete' → skip all tool calls, person is done. If matched_identity is populated → skip SkipGenie. Pass session_id and name.",
         "method": "GET",
         "url": "http://127.0.0.1:8000/heir/load-person",
+        "options": {},
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -727,6 +734,7 @@
         "toolDescription": "Load Ancestry records saved for this session and person. Pass session_id and optionally search_name to filter. Check before running Ancestry Search Save.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/ancestry-records",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"search_name\": $fromAI(\"search_name\", \"Person name to filter\", \"string\", null) } }}"
@@ -745,6 +753,7 @@
         "toolDescription": "Load court/probate findings for this session and person. Check before running Court Search. Pass session_id.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/court-findings",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"person_name\": $fromAI(\"person_name\", \"Person name to filter\", \"string\", null) } }}"
@@ -763,6 +772,7 @@
         "toolDescription": "Load voter records saved for this session. Check before running NC Voter Lookup. Pass session_id.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/voter-records",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\") } }}"
@@ -781,6 +791,7 @@
         "toolDescription": "Create or update a person record in DB (upsert). Safe to call multiple times. Call immediately after SkipGenie with matched_identity. Call after vital status determined. Call at end with cascade_needed, cascade_relatives, research_phase='complete'. REQUIRED: session_id, property_id, input_name, vital_status.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"\"),\n  \"cascade_needed\":    $fromAI(\"cascade_needed\", \"Whether cascade research needed\", \"boolean\", false),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"deceased_facts\":    $fromAI(\"deceased_facts\", \"NC Ch.29 required facts\", \"json\", {}),\n  \"obituary_url\":      $fromAI(\"obituary_url\", \"Obituary URL\", \"string\", \"\"),\n  \"obituary_text\":     $fromAI(\"obituary_text\", \"Full obituary text\", \"string\", \"\"),\n  \"estate_filed\":      $fromAI(\"estate_filed\", \"Whether estate was filed\", \"boolean\", null),\n  \"had_will\":          $fromAI(\"had_will\", \"Whether had a will\", \"boolean\", null),\n  \"cascade_relatives\": $fromAI(\"cascade_relatives\", \"Heir list\", \"json\", []),\n  \"maiden_name\":       $fromAI(\"maiden_name\", \"Maiden name if applicable\", \"string\", \"\"),\n  \"notes\":             $fromAI(\"notes\", \"Research notes\", \"string\", \"\"),\n  \"relationship_hint\": $fromAI(\"relationship_hint\", \"Relationship to root decedent\", \"string\", \"\"),\n  \"queue_id\":          $fromAI(\"queue_id\", \"Queue item ID\", \"number\", null)\n} }}"
@@ -799,6 +810,7 @@
         "toolDescription": "Save voter lookup result to DB. Call after EVERY NC Voter Lookup, including not-found. Required: session_id, property_id, search_name. Saves full_name (may be married name), county, status.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/write-voter",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"search_name\": $fromAI(\"search_name\", \"Name searched\"), \"search_context\": $fromAI(\"search_context\", \"Context e.g. orchestrator\", \"string\", \"orchestrator\"), \"ncid\": $fromAI(\"ncid\", \"NCID if found\", \"string\", null), \"full_name\": $fromAI(\"full_name\", \"Full legal name if found — may differ (married name)\", \"string\", null), \"county\": $fromAI(\"county\", \"County if found\", \"string\", null), \"status\": $fromAI(\"status\", \"Status A/I/R/D if found\", \"string\", null), \"notes\": $fromAI(\"notes\", \"Notes\", \"string\", \"\") } }}"
@@ -817,6 +829,7 @@
         "toolDescription": "Add new persons to the research queue. Use when new heirs/children are discovered during research. Required: session_id, property_id, persons=[{name, relationship_hint, maiden_name}]. Server deduplicates. Do NOT queue: the current person, single-token names, 'Estate of', 'Heirs of'.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/queue-persons",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"depth\": $fromAI(\"depth\", \"Depth level for cascade\", \"number\", 1), \"persons\": $fromAI(\"persons\", \"Array of {name, relationship_hint, maiden_name} to queue\", \"json\", []) } }}"
@@ -835,6 +848,7 @@
         "toolDescription": "PROBATE GROUND TRUTH — call this immediately when Court Researcher returns estate_filed=true with named_persons. Atomically: updates person record (estate_filed=true, cascade_needed=false, cascade_relatives=named_persons), retires all queue entries NOT in named_persons (marked resolved_by_probate), and queues the named_persons as the authoritative heir list. One call replaces 5+ manual steps. Probate supersedes SkipGenie, obituary, and census. Required: session_id, property_id, person_name, named_persons=[{name, relationship_hint}]. Optional: case_number, case_url, had_will.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/apply-probate-finding",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"person_name\": $fromAI(\"person_name\", \"Name of person whose probate was found\"), \"named_persons\": $fromAI(\"named_persons\", \"Array of {name, relationship_hint} from probate\", \"json\", []), \"case_number\": $fromAI(\"case_number\", \"Probate case number\", \"string\", \"\"), \"case_url\": $fromAI(\"case_url\", \"Probate case URL\", \"string\", \"\"), \"had_will\": $fromAI(\"had_will\", \"true/false/null\", \"boolean\", null) } }}"
@@ -853,6 +867,9 @@
         "toolDescription": "Call the Court Researcher sub-agent to handle ALL probate research for one person. Call for EVERY deceased person without exception — even if an obit was found. Probate supersedes obituary for the legal heir list. Pass person_name, county, session_id, property_id. Returns: {estate_filed, had_will, case_number, case_url, named_persons[], notes}. If estate_filed=true with named_persons → cascade_needed=false, use those as heirs.",
         "method": "POST",
         "url": "http://localhost:5678/webhook/heir-court-researcher",
+        "options": {
+          "timeout": 900000
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"person_name\": $fromAI(\"person_name\", \"Full name of person to research\"), \"county\": $fromAI(\"county\", \"NC county for court search\"), \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
@@ -915,6 +932,7 @@
         "toolDescription": "Search Ancestry AND auto-save results to DB. Pass session_id, property_id, first_name, last_name, death_year, death_location, collection_id.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/ancestry/search-and-save",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"first_name\": $fromAI(\"first_name\", \"First name\", \"string\", \"\"), \"last_name\": $fromAI(\"last_name\", \"Last name\", \"string\", \"\"), \"birth_year\": $fromAI(\"birth_year\", \"Birth year\", \"string\", \"\"), \"death_year\": $fromAI(\"death_year\", \"Death year\", \"string\", \"\"), \"death_location\": $fromAI(\"death_location\", \"Death location\", \"string\", \"\"), \"collection_id\": $fromAI(\"collection_id\", \"Collection ID\", \"string\", \"61843\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\") } }}"
@@ -933,6 +951,7 @@
         "toolDescription": "Fetch a specific Ancestry record's full detail page AND save it. Use source_url (preferred) or record_id. Returns canonical full-name children list.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/ancestry/record-and-save",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"record_id\": $fromAI(\"record_id\", \"source_url preferred, or numeric record_id\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\") } }}"
@@ -951,6 +970,7 @@
         "toolDescription": "Search the web using Perplexity AI — reads and synthesizes results from newspapers, legacy.com, findagrave, funeral home sites, and more. Returns a direct answer, not just links. Pass query as: '[FIRST NAME] [LAST NAME] [CITY] NC obituary [YEAR]'.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/search/perplexity",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"query\": $fromAI(\"query\", \"Search query e.g. Mary Justice Wake Forest NC obituary 2001\") } }}"
@@ -1056,6 +1076,7 @@
         "toolDescription": "Search SkipGenie for a person. PAID — only call once. Pass first_name, last_name, street_address, city, zip_code, state.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/skipgenie",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"first_name\": $fromAI(\"first_name\", \"First name\"), \"last_name\": $fromAI(\"last_name\", \"Last name\"), \"middle_name\": $fromAI(\"middle_name\", \"Middle name if known\", \"string\", \"\"), \"street_address\": $fromAI(\"street_address\", \"Street address\", \"string\", \"\"), \"state\": $fromAI(\"state\", \"State\", \"string\", \"NC\"), \"city\": $fromAI(\"city\", \"City\", \"string\", \"\"), \"zip_code\": $fromAI(\"zip_code\", \"ZIP code\", \"string\", \"\") } }}"
@@ -1074,6 +1095,7 @@
         "toolDescription": "Create or update a person record in DB. Call immediately after SkipGenie with matched_identity. Required: session_id, property_id, input_name, vital_status.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/upsert-person",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"skipgenie\"),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"contact_phones\":    $fromAI(\"contact_phones\", \"Phone numbers from SkipGenie result\", \"json\", []),\n  \"contact_emails\":    $fromAI(\"contact_emails\", \"Email addresses from SkipGenie result\", \"json\", []),\n  \"notes\":             $fromAI(\"notes\", \"Notes\", \"string\", \"\")\n} }}"
@@ -1412,6 +1434,7 @@
         "toolDescription": "Load all person records for this session — vital_status, cascade_needed, cascade_relatives, estate_filed, obituary data for every person researched. Required: session_id.",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/persons",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\") } }}"
@@ -1430,6 +1453,7 @@
         "toolDescription": "Write the final resolved family tree to DB. Call once at the end after applying NC Ch. 29 to all branches. Required: session_id, property_id, root_decedent_name, heir_tree (array of heir nodes with share_fraction and basis).",
         "method": "POST",
         "url": "http://127.0.0.1:8000/heir/write",
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\"), \"root_decedent_name\": $fromAI(\"root_decedent_name\", \"Full name of the root decedent (e.g. Lydia L Hayes)\"), \"heir_tree\": $fromAI(\"heir_tree\", \"Complete heir tree array\", \"json\", []), \"notes\": $fromAI(\"notes\", \"Summary notes\", \"string\", \"\") } }}"
@@ -2206,7 +2230,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "653ffba7-ca6f-49c7-ad88-75ae65a38bc5",
+  "versionId": "47fc1cbe-1719-4307-90cd-01b83b7c490d",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },

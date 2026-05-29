@@ -81,7 +81,7 @@ def agent_node(name: str, node_id: str, system_msg: str, text_expr: str, max_ite
         },
     }
 
-def http_tool(name: str, node_id: str, description: str, url: str, body_expr: str, method: str = "POST") -> dict:
+def http_tool(name: str, node_id: str, description: str, url: str, body_expr: str, method: str = "POST", timeout: int = 0) -> dict:
     node = {
         "id": node_id,
         "name": name,
@@ -92,6 +92,7 @@ def http_tool(name: str, node_id: str, description: str, url: str, body_expr: st
             "toolDescription": description,
             "method": method,
             "url": url,
+            "options": {"timeout": timeout} if timeout else {},
         },
     }
     if method == "GET":
@@ -99,8 +100,6 @@ def http_tool(name: str, node_id: str, description: str, url: str, body_expr: st
         node["parameters"]["queryParameters"] = {
             "parameters": []
         }
-        # For GET tools we embed query logic differently; use sendBody=False
-        # Store body_expr in a custom key for reference — actual GET tools use queryParameters
         node["parameters"]["_body_expr_ref"] = body_expr
     else:
         node["parameters"]["sendBody"] = True
@@ -912,6 +911,7 @@ court_researcher_tool = http_tool(
     ),
     f"{LOCALHOST_N8N}/webhook/heir-court-researcher",
     '={{ { "person_name": $fromAI("person_name", "Full name of person to research"), "county": $fromAI("county", "NC county for court search"), "session_id": $fromAI("session_id", "Session ID"), "property_id": $fromAI("property_id", "Property ID") } }}',
+    timeout=900000,  # 15 min — Playwright CAPTCHA solve can take up to 10 min
 )
 
 # ── Obituary Research Agent (AI tool connected to Orchestrator) ──────────────
