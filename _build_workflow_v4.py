@@ -517,13 +517,17 @@ One invocation = one person. New persons discovered (children from an obit, bene
 
 **Court research (for every deceased person — always):**
 6. Court Researcher Tool (sub-agent) — pass person_name, county, session_id, property_id. It handles Court Search variants, ROA, and Document Pull internally. Returns {estate_filed, had_will, case_number, case_url, named_persons[], notes}.
-   - If estate_filed=true with named_persons → cascade_needed=false, queue those named persons, write person, done.
-   - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], done permanently.
+   - **Probate is ground truth.** If estate_filed=true with named_persons: this is a legal record and supersedes ALL other sources (SkipGenie, obituary, census). Immediately:
+     a. Set cascade_needed=false, cascade_relatives = named_persons list.
+     b. Queue ONLY the probate named_persons — retire any previously queued persons who are now resolved by this filing.
+     c. Call Load Person (Orch) for each already-researched person in this session. If any of them appear in named_persons, update their record with estate confirmation. If any queued persons are NOT in named_persons, mark them as resolved_by_probate and remove from active queue.
+     d. Write person with estate_filed=true, had_will, cascade_needed=false. Done — do NOT continue to obituary/census for this person.
+   - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], branch permanently closed.
 
 **Obituary research (only if no probate found with named persons):**
 7. Call Ancestry Selector Agent (AI tool) — pass first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. Also pass any available context: maiden_name (birth surname if person married), known_relatives (comma-separated names of known family members from voter/court data), root_dob_year (birth year of root decedent — for generation gap validation), root_relationship (e.g. "child", "sibling"), property_city, known_spouse. The agent scores all candidates using evidence overlap — name match, parent names, relative overlap, address, spouse — and returns the single best match. Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, notes}. Use this INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context.
 8. Only fall back to Ancestry Search Save (Orch) directly if Ancestry Selector returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843).
-9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: "[FULL NAME] obituary [county] NC [year]".
+9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: "[FIRST NAME] [LAST NAME] [CITY] NC obituary [year]". City is more precise than county — use the property city or last known city from SkipGenie.
 10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.
 
 **Census household (when obit didn't name all children):**
@@ -1018,11 +1022,13 @@ first_name, last_name, street_address, city, zip_code, state, session_id, proper
 
 1. Call SkipGenie (SR) with ALL provided address fields: first_name, last_name, street_address, city, zip_code, state. The property address is the best geographic anchor — family members typically lived nearby.
 
-2. Select the best match:
-   - Prefer: deceased=true if expected deceased
-   - Prefer: address closest to the property address
+2. Select the best match using address cross-check:
+   - REQUIRED: the result's last_address city OR zip must match the property city/zip. If no result has a matching address, matched=false — do not accept a name-only match.
+   - Prefer: deceased=true if person is expected to be deceased
+   - Prefer: address on same street or in same zip as property (chain of ownership addresses are the strongest anchor)
    - Prefer: possible_relatives contains known family names
-   - If no convincing match: matched=false
+   - If multiple results pass the address check, prefer the one with the closest address match
+   - If no result passes address cross-check: matched=false
 
 3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status="unknown", research_phase="skipgenie", matched_identity.
 

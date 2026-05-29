@@ -1,16 +1,20 @@
 """
-Claude Vision extraction — Prompt 2 (Document Processing).
-Sends PDF pages as images + parcel reference, returns structured document_extractions JSON.
+Document extraction — Prompt 2 (Document Processing).
+Text-layer PDFs: Claude text extraction (cheap).
+Scanned/image PDFs: Gemini Vision (better accuracy on handwritten/old documents).
 """
 import base64
 import json
 import os
 import anthropic
+from google import genai
+from google.genai import types as genai_types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-_MODEL = "claude-sonnet-4-6"
+_CLAUDE_MODEL = "claude-sonnet-4-6"
+_GEMINI_MODEL = "gemini-2.0-flash"
 _MAX_TOKENS = 4096
 
 _SYSTEM_PROMPT = """You are extracting structured data from a recorded county document (deed, mortgage, court filing, etc.) using its OCR text or document images. You will also judge whether this document pertains to a specific parcel.
@@ -100,12 +104,58 @@ def extract_from_images(
     ocr_confidence: float = 1.0,
 ) -> dict:
     """
-    Send PDF page images to Claude and return structured document_extractions dict.
+    Send PDF page images to Gemini Vision and return structured document_extractions dict.
+    Gemini is used for scanned/image PDFs — better accuracy on handwritten and old documents.
+    Falls back to Claude Vision if GEMINI_API_KEY is not set.
     """
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        return _extract_from_images_gemini(images, parcel_reference, ocr_confidence)
+    return _extract_from_images_claude(images, parcel_reference, ocr_confidence)
+
+
+def _extract_from_images_gemini(
+    images: list[bytes],
+    parcel_reference: dict,
+    ocr_confidence: float = 1.0,
+) -> dict:
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+    parts = [genai_types.Part.from_text(text=_SYSTEM_PROMPT + "\n\nExtract the following document:")]
+    for i, img_bytes in enumerate(images):
+        parts.append(genai_types.Part.from_bytes(data=img_bytes, mime_type="image/png"))
+        parts.append(genai_types.Part.from_text(text=f"[Page {i + 1} of {len(images)}]"))
+    parts.append(genai_types.Part.from_text(text=json.dumps({
+        "ocr_confidence": ocr_confidence,
+        "parcel_reference": parcel_reference,
+    })))
+
+    response = client.models.generate_content(
+        model=_GEMINI_MODEL,
+        contents=parts,
+        config=genai_types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=_MAX_TOKENS,
+        ),
+    )
+
+    raw = response.text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    return json.loads(raw)
+
+
+def _extract_from_images_claude(
+    images: list[bytes],
+    parcel_reference: dict,
+    ocr_confidence: float = 1.0,
+) -> dict:
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     content = []
-
     for i, img_bytes in enumerate(images):
         content.append({
             "type": "image",
@@ -115,21 +165,15 @@ def extract_from_images(
                 "data": base64.standard_b64encode(img_bytes).decode("utf-8"),
             },
         })
-        content.append({
-            "type": "text",
-            "text": f"[Page {i + 1} of {len(images)}]",
-        })
+        content.append({"type": "text", "text": f"[Page {i + 1} of {len(images)}]"})
 
     content.append({
         "type": "text",
-        "text": json.dumps({
-            "ocr_confidence": ocr_confidence,
-            "parcel_reference": parcel_reference,
-        }),
+        "text": json.dumps({"ocr_confidence": ocr_confidence, "parcel_reference": parcel_reference}),
     })
 
     response = client.messages.create(
-        model=_MODEL,
+        model=_CLAUDE_MODEL,
         max_tokens=_MAX_TOKENS,
         temperature=0.2,
         system=_SYSTEM_PROMPT,
@@ -137,14 +181,11 @@ def extract_from_images(
     )
 
     raw = response.content[0].text.strip()
-
-    # Strip markdown fences if Claude wrapped it anyway
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
         raw = raw.strip()
-
     return json.loads(raw)
 
 
@@ -166,7 +207,7 @@ def extract_from_text(
     })
 
     response = client.messages.create(
-        model=_MODEL,
+        model=_CLAUDE_MODEL,
         max_tokens=_MAX_TOKENS,
         temperature=0.2,
         system=_SYSTEM_PROMPT,
