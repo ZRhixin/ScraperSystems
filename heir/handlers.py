@@ -1022,18 +1022,20 @@ def apply_probate_finding(data: dict) -> tuple[int, dict]:
         with dict_cursor(conn) as cur:
 
             # 1. Update the researched person record
+            # cascade_relatives lives inside orchestrator_output JSON blob
+            orch_patch = _dump({"cascade_relatives": named_persons, "estate_filed": True, "cascade_needed": False})
             cur.execute("""
                 UPDATE heir_research_persons
-                SET estate_filed      = true,
-                    had_will          = %s,
-                    cascade_needed    = false,
-                    cascade_relatives = %s,
-                    research_phase    = 'complete',
-                    updated_at        = NOW()
+                SET estate_filed       = true,
+                    had_will           = %s,
+                    cascade_needed     = false,
+                    orchestrator_output = COALESCE(orchestrator_output, '{}'::jsonb) || %s::jsonb,
+                    research_phase     = 'complete',
+                    updated_at         = NOW()
                 WHERE session_id = %s AND UPPER(input_name) = UPPER(%s)
             """, (
                 had_will,
-                _dump(named_persons),
+                orch_patch,
                 session_id, person_name,
             ))
 
