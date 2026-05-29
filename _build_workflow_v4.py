@@ -264,11 +264,14 @@ NID = {k: nid(k) for k in [
     # Orchestrator tools — sub-agents (HTTP webhook)
     "Court Researcher Tool",
 
-    # Ancestry Selector Agent (AI tool wired to Orchestrator)
-    "Ancestry Selector Agent",
-    "Ancestry Selector Model",
+    # Obituary Research Agent (AI tool wired to Orchestrator)
+    "Obituary Research Agent",
+    "Obituary Research Model",
     "Ancestry Search Save (AS)",
     "Ancestry Record (AS)",
+    "Perplexity (ORA)",
+    "Brave Search (ORA)",
+    "Fetch Obituary Page (ORA)",
 
     # SkipGenie Resolver Agent (AI tool wired to Orchestrator)
     "SkipGenie Resolver Agent",
@@ -525,9 +528,8 @@ One invocation = one person. New persons discovered (children from an obit, bene
    - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], branch permanently closed.
 
 **Obituary research (only if no probate found with named persons):**
-7. Call Ancestry Selector Agent (AI tool) — pass first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. Also pass any available context: maiden_name (birth surname if person married), known_relatives (comma-separated names of known family members from voter/court data), root_dob_year (birth year of root decedent — for generation gap validation), root_relationship (e.g. "child", "sibling"), property_city, known_spouse. The agent scores all candidates using evidence overlap — name match, parent names, relative overlap, address, spouse — and returns the single best match. Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, notes}. Use this INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context.
-8. Only fall back to Ancestry Search Save (Orch) directly if Ancestry Selector returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843).
-9. Brave Search (Orch) — only if Ancestry returned nothing or wrong state results. Pattern: "[FIRST NAME] [LAST NAME] [CITY] NC obituary [year]". City is more precise than county — use the property city or last known city from SkipGenie.
+7. Call Obituary Research Agent (AI tool) — runs Ancestry + Perplexity + Brave in parallel, cross-validates all findings, and returns ONLY a confirmed match. Pass: first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. Also pass when known: maiden_name, known_relatives, root_dob_year, root_relationship, property_city, known_spouse. Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, sources_found, notes}. A null result means no source found a confirmed match — do not retry with individual tools.
+8. Only call Ancestry Search Save (Orch) directly if Obituary Research Agent returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843 which is the obit index already searched by the agent).
 10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.
 
 **Census household (when obit didn't name all children):**
@@ -883,78 +885,96 @@ court_researcher_tool = http_tool(
     '={{ { "person_name": $fromAI("person_name", "Full name of person to research"), "county": $fromAI("county", "NC county for court search"), "session_id": $fromAI("session_id", "Session ID"), "property_id": $fromAI("property_id", "Property ID") } }}',
 )
 
-# ── Ancestry Selector Agent (AI tool connected to Orchestrator) ───────────────
+# ── Obituary Research Agent (AI tool connected to Orchestrator) ──────────────
 
-ANCESTRY_SELECTOR_PROMPT = """You are the Ancestry Selector. Search Ancestry for ONE person's obituary, score every candidate against known family context, and return the best-evidenced NC match.
+OBITUARY_RESEARCH_PROMPT = """You are the Obituary Research Agent. Your job is to find and CONFIRM the obituary of ONE specific person using three parallel sources, then synthesize all findings into a single high-confidence result.
+
+**The most important rule: a null result is always better than a wrong match. Never accept a match on weak evidence.**
 
 ## Input (from parent agent)
 first_name, last_name, death_year, death_location, session_id, property_id
 Optional context (use when provided):
-- maiden_name — birth surname if the person married (e.g. "Hayes")
-- known_relatives — list of already-researched family members (names + relationships)
-- root_dob_year — birth year of the root decedent (e.g. 1892 for Lydia Hayes)
-- root_relationship — this person's relationship to the root (e.g. "child", "grandchild")
-- property_city — city of the property (e.g. "Wake Forest")
-- known_spouse — spouse name if known from SkipGenie or prior research
+- maiden_name — birth surname if person married
+- known_relatives — comma-separated names of known family members
+- root_dob_year — birth year of root decedent (for generation gap check)
+- root_relationship — this person's relationship to root (e.g. "child", "grandchild")
+- property_city — city of the property
+- known_spouse — spouse name if known
 
-## Steps
+## Step 1 — Run all three sources
 
-1. Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id="61843", session_id, property_id. Results auto-save to DB.
+**A. Ancestry (structured obit index)**
+Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id="61843", session_id, property_id.
 
-2. **Score every returned record** using the evidence matrix below. Do NOT hard-reject on name alone — married women change last names. Score each candidate, pick the highest scorer.
+**B. Perplexity (web-wide synthesis)**
+Call Perplexity (ORA) with query: "[FIRST NAME] [LAST NAME] [PROPERTY CITY] NC obituary [DEATH YEAR]"
+Perplexity searches newspapers, legacy.com, findagrave, funeral home sites, and synthesizes the answer.
 
-### Hard Rejects (eliminate immediately, no score):
-- death_location contains a US state other than North Carolina / NC → reject
+**C. Brave Search (raw URL fallback)**
+Call Brave Search (ORA) with query: "[FIRST NAME] [LAST NAME] [PROPERTY CITY] NC obituary [DEATH YEAR]"
+If a promising non-Ancestry URL is found → call Fetch Obituary Page (ORA) to read the full text.
+
+## Step 2 — Score every candidate from all sources
+
+### Hard Rejects (eliminate immediately):
+- death_location is outside North Carolina → reject
 - dod before 1960 → reject
-- Generation impossible: if root_dob_year is provided and root_relationship="child", the candidate's dob must be at least 15 years after root_dob_year. If dob gap is < 15 years, the candidate is the same generation as the root — reject. Example: root born 1892, searching for a child → candidate must be born 1907 or later.
+- Generation gap impossible: if root_dob_year provided and root_relationship="child", candidate dob must be ≥ 15 years after root_dob_year → reject if not
 
-### Scoring signals (award points, pick highest total):
+### Scoring signals:
 | Signal | Points |
 |---|---|
 | First name matches (case-insensitive) | +4 |
-| Last name matches OR maiden_name matches (e.g. "nee Hayes" in record) | +3 |
-| death_location is Wake County / Wake Forest NC | +3 |
-| Parent listed in record matches root decedent name (e.g. "Lydia Hayes") | +5 |
-| Sibling or child in record matches a known_relative name | +3 per match |
+| Last name OR maiden_name matches | +3 |
+| death_location is property county/city | +3 |
+| Parent listed in record matches root decedent name | +5 |
+| Known relative name appears in record | +3 per match |
 | dod year within ±2 of death_year | +2 |
-| dob plausible for expected generation (child born ~20-40 yrs after root) | +2 |
-| Church or funeral home matches root decedent's known church/location | +2 |
-| known_spouse name appears in record | +3 |
-| First name does NOT match and maiden_name does NOT match | -3 |
+| dob plausible for expected generation | +2 |
+| Known spouse name appears | +3 |
+| Property address / city / street appears in record | +4 |
+| First name does NOT match AND maiden_name does NOT match | -3 |
 
-3. **Minimum threshold:** A candidate must score ≥ 4 points to be selected. If no candidate reaches 4, return `{"found": false}` immediately — do NOT guess, do NOT pick the "closest" name. A null result is always better than a wrong match. Low confidence (score 1–3) is not a reason to return something — it is a reason to return nothing.
+## Step 3 — Synthesis (CRITICAL)
 
-4. If best candidate found: call Ancestry Record (AS) using source_url (preferred over bare record_id). Gets canonical full-name children list with married surnames. ALWAYS do this step.
+**Acceptance rules — ALL must be satisfied:**
+1. Score ≥ 6 points
+2. At least 2 different signal types score points (e.g. name + location, NOT name + name)
+3. At least one signal ties back to the property (address, city, county, or known family member from deed/court records)
+4. **Multi-source confirmation:** if 2+ sources independently describe the same person → confidence=high. If only 1 source found something → confidence=medium at best, requires score ≥ 8.
+5. If sources conflict (different people for same search) → return found=false, log conflict in notes — do NOT guess.
 
-5. Return ONLY this JSON:
+If best candidate found: call Ancestry Record (AS) using source_url to get full children list with married surnames.
+
+## Step 4 — Return ONLY this JSON:
 {
   "found": true/false,
-  "record_id": "...",
-  "source_url": "...",
   "person_name": "...",
   "dob": "...",
   "dod": "...",
   "death_location": "...",
   "children": ["FIRST LAST"],
-  "obit_text": "...full text if available...",
+  "obit_text": "...best available text...",
   "confidence": "high|medium|low",
-  "score": <integer points>,
-  "notes": "List each signal that scored points and why this record was selected over others."
+  "score": <integer>,
+  "sources_found": ["ancestry", "perplexity", "brave"],
+  "notes": "Which signals scored, which sources agreed/conflicted, why selected or rejected."
 }"""
 
-ancestry_selector_agent = agent_tool_node(
-    "Ancestry Selector Agent", NID["Ancestry Selector Agent"],
+obituary_research_agent = agent_tool_node(
+    "Obituary Research Agent", NID["Obituary Research Agent"],
     tool_description=(
-        "Search Ancestry for a person's obituary and return the single best NC match. "
-        "Handles full search + NC candidate selection + Ancestry Record detail internally. "
-        "Returns {found, person_name, dob, dod, death_location, children[], obit_text, confidence, score, notes}. "
-        "Use INSTEAD of calling Ancestry Search Save + Ancestry Record directly — avoids 100+ raw records flooding context. "
+        "Search Ancestry + Perplexity + Brave for a person's obituary, synthesize all findings, "
+        "and return the single best-confirmed NC match. "
+        "Runs all 3 sources internally and requires multi-signal + property-link confirmation before accepting. "
+        "Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, sources_found, notes}. "
+        "A null result is returned when no source finds a confident match — never returns a weak guess. "
         "Pass: first_name, last_name, death_year, death_location, session_id, property_id. "
-        "Also pass when known: maiden_name, known_relatives (comma-separated), root_dob_year, root_relationship (e.g. 'decedent'), property_city, known_spouse."
+        "Also pass when known: maiden_name, known_relatives, root_dob_year, root_relationship, property_city, known_spouse."
     ),
-    system_msg=ANCESTRY_SELECTOR_PROMPT,
+    system_msg=OBITUARY_RESEARCH_PROMPT,
     text_expr=(
-        '={{ `Select best Ancestry obituary match.\n\n'
+        '={{ `Research obituary from all sources.\n\n'
         'First Name: ${$fromAI("first_name", "First name")}\n'
         'Last Name: ${$fromAI("last_name", "Last name")}\n'
         'Death Year: ${$fromAI("death_year", "Estimated death year", "string", "")}\n'
@@ -963,14 +983,33 @@ ancestry_selector_agent = agent_tool_node(
         'Property ID: ${$fromAI("property_id", "Property ID")}\n'
         'Maiden Name: ${$fromAI("maiden_name", "Birth surname if person married", "string", "")}\n'
         'Known Relatives: ${$fromAI("known_relatives", "Comma-separated names of known relatives", "string", "")}\n'
-        'Root DOB Year: ${$fromAI("root_dob_year", "Birth year of root decedent for generation gap check", "string", "")}\n'
-        'Root Relationship: ${$fromAI("root_relationship", "Relationship to root decedent e.g. child sibling", "string", "")}\n'
+        'Root DOB Year: ${$fromAI("root_dob_year", "Birth year of root decedent", "string", "")}\n'
+        'Root Relationship: ${$fromAI("root_relationship", "Relationship to root decedent", "string", "")}\n'
         'Property City: ${$fromAI("property_city", "City where property is located", "string", "")}\n'
         'Known Spouse: ${$fromAI("known_spouse", "Name of known spouse if any", "string", "")}` }}'
     ),
-    max_iter=10,
+    max_iter=15,
 )
-ancestry_selector_model = gpt_model("GPT-5-Mini (Ancestry Selector)", NID["Ancestry Selector Model"])
+obituary_research_model = gpt_model("GPT-5-Mini (Obituary Research)", NID["Obituary Research Model"])
+
+perplexity_ora = http_tool(
+    "Perplexity (ORA)", NID["Perplexity (ORA)"],
+    (
+        "Search the web using Perplexity AI — reads and synthesizes results from newspapers, "
+        "legacy.com, findagrave, funeral home sites, and more. Returns a direct answer, not just links. "
+        "Pass query as: '[FIRST NAME] [LAST NAME] [CITY] NC obituary [YEAR]'."
+    ),
+    f"{BASE}/search/perplexity",
+    '={{ { "query": $fromAI("query", "Search query e.g. Mary Justice Wake Forest NC obituary 2001") } }}',
+)
+
+brave_search_ora = v3node("Brave Search")
+brave_search_ora["id"]   = NID["Brave Search (ORA)"]
+brave_search_ora["name"] = "Brave Search (ORA)"
+
+fetch_obit_ora = v3node("Fetch Obituary Page")
+fetch_obit_ora["id"]   = NID["Fetch Obituary Page (ORA)"]
+fetch_obit_ora["name"] = "Fetch Obituary Page (ORA)"
 
 ancestry_search_save_as = http_tool(
     "Ancestry Search Save (AS)", NID["Ancestry Search Save (AS)"],
@@ -1378,9 +1417,10 @@ all_nodes = [
     write_person_orch, write_voter_orch, queue_persons_orch,
     # Sub-agent tools
     court_researcher_tool,
-    # Ancestry Selector Agent (AI tool)
-    ancestry_selector_agent, ancestry_selector_model,
+    # Obituary Research Agent (AI tool)
+    obituary_research_agent, obituary_research_model,
     ancestry_search_save_as, ancestry_record_as,
+    perplexity_ora, brave_search_ora, fetch_obit_ora,
     # SkipGenie Resolver Agent (AI tool)
     skipgenie_resolver_agent, skipgenie_resolver_model,
     sg_sr, write_person_sr,
@@ -1464,12 +1504,15 @@ connections = {
     "Queue Persons (Orch)":          {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     # Sub-agent tools → orchestrator
     "Court Researcher Tool":         {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
-    "Ancestry Selector Agent":       {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "Obituary Research Agent":       {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     "SkipGenie Resolver Agent":      {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
-    # Ancestry Selector internal
-    "GPT-5-Mini (Ancestry Selector)": {"ai_languageModel": [[ai_lang("Ancestry Selector Agent")]]},
-    "Ancestry Search Save (AS)":     {"ai_tool": [[ai_tool("Ancestry Selector Agent")]]},
-    "Ancestry Record (AS)":          {"ai_tool": [[ai_tool("Ancestry Selector Agent")]]},
+    # Obituary Research Agent internal
+    "GPT-5-Mini (Obituary Research)": {"ai_languageModel": [[ai_lang("Obituary Research Agent")]]},
+    "Ancestry Search Save (AS)":     {"ai_tool": [[ai_tool("Obituary Research Agent")]]},
+    "Ancestry Record (AS)":          {"ai_tool": [[ai_tool("Obituary Research Agent")]]},
+    "Perplexity (ORA)":              {"ai_tool": [[ai_tool("Obituary Research Agent")]]},
+    "Brave Search (ORA)":            {"ai_tool": [[ai_tool("Obituary Research Agent")]]},
+    "Fetch Obituary Page (ORA)":     {"ai_tool": [[ai_tool("Obituary Research Agent")]]},
     # SkipGenie Resolver internal
     "GPT-5-Mini (SkipGenie Resolver)": {"ai_languageModel": [[ai_lang("SkipGenie Resolver Agent")]]},
     "SkipGenie (SR)":                {"ai_tool": [[ai_tool("SkipGenie Resolver Agent")]]},
@@ -1575,12 +1618,15 @@ POS: dict[str, list[int]] = {
     "Queue Persons (Orch)":         [520,  2180],
     "Court Researcher Tool":        [520,  2360],
     # AI sub-agent tools (col 4: x=740)
-    "Ancestry Selector Agent":      [740,  1820],
+    "Obituary Research Agent":      [740,  1820],
     "SkipGenie Resolver Agent":     [740,  2000],
-    # Ancestry Selector internals
-    "GPT-5-Mini (Ancestry Selector)": [1000, 1820],
+    # Obituary Research Agent internals
+    "GPT-5-Mini (Obituary Research)": [1000, 1820],
     "Ancestry Search Save (AS)":    [960,  2000],
     "Ancestry Record (AS)":         [960,  2180],
+    "Perplexity (ORA)":             [960,  2360],
+    "Brave Search (ORA)":           [960,  2540],
+    "Fetch Obituary Page (ORA)":    [960,  2720],
     # SkipGenie Resolver internals
     "GPT-5-Mini (SkipGenie Resolver)": [1000, 2360],
     "SkipGenie (SR)":               [960,  2540],

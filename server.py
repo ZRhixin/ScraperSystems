@@ -757,6 +757,41 @@ def _ancestry_household(data: dict) -> tuple[int, dict]:
 
 
 # ---------------------------------------------------------------------------
+# Perplexity web search
+# ---------------------------------------------------------------------------
+
+def _perplexity_search(d: dict):
+    import urllib.request
+    query = d.get("query", "").strip()
+    if not query:
+        return 400, {"error": "query is required"}
+    api_key = os.getenv("PERPLEXITY_API_KEY", "")
+    if not api_key:
+        return 500, {"error": "PERPLEXITY_API_KEY not set"}
+    payload = json.dumps({
+        "model": "sonar",
+        "messages": [{"role": "user", "content": query}],
+        "max_tokens": 1024,
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.perplexity.ai/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read())
+        answer = body["choices"][0]["message"]["content"]
+        return 200, {"query": query, "answer": answer}
+    except Exception as e:
+        return 500, {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
@@ -828,6 +863,8 @@ _ROUTES: dict[str, callable] = {
     "/ancestry/search-and-save":                 lambda d: _ancestry_search_and_save(d),
     "/ancestry/record-and-save":                 lambda d: _ancestry_record_and_save(d),
     "/ancestry/household":                       lambda d: _ancestry_household(d),
+    # Perplexity web search
+    "/search/perplexity":                        lambda d: _perplexity_search(d),
     # NC Voter Registration — living status + married name discovery
     "/voter/nc/lookup":                          lambda d: (200, ncvoter_lookup(
         last_name=d.get("last_name",""),
