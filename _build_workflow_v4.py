@@ -1124,6 +1124,8 @@ first_name, last_name, street_address, city, zip_code, state, session_id, proper
    - If no result passes address cross-check: matched=false
 
 3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status="unknown", research_phase="skipgenie", matched_identity.
+   - If matched=true, also pass contact_phones (array of phone strings) and contact_emails (array of email strings) from the matched result. These are saved for eventual outreach.
+   - Example: contact_phones=["(919) 555-1234", "(919) 555-5678"], contact_emails=["john@example.com"]
 
 4. Return ONLY this JSON:
 {
@@ -1136,6 +1138,8 @@ first_name, last_name, street_address, city, zip_code, state, session_id, proper
   "last_address": "...",
   "city": "...",
   "state": "...",
+  "phones": ["..."],
+  "emails": ["..."],
   "possible_relatives": [{"name": "...", "age": "...", "pid": "..."}],
   "pid": "...",
   "notes": "Brief match rationale."
@@ -1202,6 +1206,8 @@ write_person_sr = http_tool(
   "vital_status":      $fromAI("vital_status", "living|deceased|unknown"),
   "research_phase":    $fromAI("research_phase", "skipgenie|vital_status|complete", "string", "skipgenie"),
   "matched_identity":  $fromAI("matched_identity", "SkipGenie matched identity", "json", {}),
+  "contact_phones":    $fromAI("contact_phones", "Phone numbers from SkipGenie result", "json", []),
+  "contact_emails":    $fromAI("contact_emails", "Email addresses from SkipGenie result", "json", []),
   "notes":             $fromAI("notes", "Notes", "string", "")
 } }}""",
 )

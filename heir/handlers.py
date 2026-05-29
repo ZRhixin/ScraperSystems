@@ -1613,6 +1613,8 @@ def upsert_person(data: dict) -> tuple[int, dict]:
     relationship_hint = (data.get("relationship_hint") or "").strip() or None
     obituary_named_survivors = data.get("obituary_named_survivors") or []
     ancestry_named_children  = data.get("ancestry_named_children") or []
+    contact_phones = data.get("contact_phones") or []
+    contact_emails = data.get("contact_emails") or []
 
     with get_conn() as conn:
         with dict_cursor(conn) as cur:
@@ -1676,6 +1678,12 @@ def upsert_person(data: dict) -> tuple[int, dict]:
                 if ancestry_named_children:
                     set_clauses.append("ancestry_named_children = %s")
                     params.append(_dump(ancestry_named_children))
+                if contact_phones:
+                    set_clauses.append("contact_phones = %s")
+                    params.append(_dump(contact_phones))
+                if contact_emails:
+                    set_clauses.append("contact_emails = %s")
+                    params.append(_dump(contact_emails))
                 if branch_id:
                     set_clauses.append("branch_id = %s")
                     params.append(branch_id)
@@ -1703,7 +1711,8 @@ def upsert_person(data: dict) -> tuple[int, dict]:
                         deed_transfers, cascade_needed,
                         obituary_url, obituary_text, claim_sources,
                         maiden_name, level, branch_id, parent_person_id,
-                        research_phase, obituary_named_survivors, ancestry_named_children
+                        research_phase, obituary_named_survivors, ancestry_named_children,
+                        contact_phones, contact_emails
                     ) VALUES (
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
@@ -1713,7 +1722,8 @@ def upsert_person(data: dict) -> tuple[int, dict]:
                         %s, %s,
                         %s, %s, %s,
                         %s, %s, %s, %s,
-                        %s, %s, %s
+                        %s, %s, %s,
+                        %s, %s
                     )
                     RETURNING id
                 """, (
@@ -1734,6 +1744,8 @@ def upsert_person(data: dict) -> tuple[int, dict]:
                     research_phase,
                     _dump(obituary_named_survivors),
                     _dump(ancestry_named_children),
+                    _dump(contact_phones),
+                    _dump(contact_emails),
                 ))
                 row = cur.fetchone()
                 person_id = row["id"]

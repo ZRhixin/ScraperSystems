@@ -408,7 +408,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://heirmatrix-n8n-staging:5678/webhook/heir-orchestrator",
+        "url": "http://localhost:5678/webhook/heir-orchestrator",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (function() {\n  try {\n    const q = $('Queue Initial Relatives').first().json;\n    const sess = $('Create Heir Session').first().json;\n    const firstQueued = (q.queued || [])[0] || null;\n    if (!firstQueued) {\n      return {\n        session_id: sess.session_id,\n        property_id: sess.property_id,\n        county: sess.county || '',\n        person_name: '',\n        relationship_hint: '',\n        queue_id: null,\n        _no_persons: true,\n      };\n    }\n    return {\n      session_id: sess.session_id,\n      property_id: sess.property_id,\n      county: sess.county || '',\n      person_name: firstQueued.person_name,\n      relationship_hint: firstQueued.person_name || 'child',\n      maiden_name: firstQueued.maiden_name || '',\n      queue_id: firstQueued.queue_id,\n    };\n  } catch(e) {\n    const sess = $('Create Heir Session').first().json;\n    return {\n      session_id: sess.session_id,\n      property_id: sess.property_id,\n      county: sess.county || '',\n      person_name: '',\n      relationship_hint: '',\n      queue_id: null,\n      _error: e.message,\n    };\n  }\n})() }}",
@@ -852,7 +852,7 @@
       "parameters": {
         "toolDescription": "Call the Court Researcher sub-agent to handle ALL probate research for one person. Call for EVERY deceased person without exception — even if an obit was found. Probate supersedes obituary for the legal heir list. Pass person_name, county, session_id, property_id. Returns: {estate_filed, had_will, case_number, case_url, named_persons[], notes}. If estate_filed=true with named_persons → cascade_needed=false, use those as heirs.",
         "method": "POST",
-        "url": "http://heirmatrix-n8n-staging:5678/webhook/heir-court-researcher",
+        "url": "http://localhost:5678/webhook/heir-court-researcher",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"person_name\": $fromAI(\"person_name\", \"Full name of person to research\"), \"county\": $fromAI(\"county\", \"NC county for court search\"), \"session_id\": $fromAI(\"session_id\", \"Session ID\"), \"property_id\": $fromAI(\"property_id\", \"Property ID\") } }}"
@@ -1013,7 +1013,7 @@
         "toolDescription": "Resolve a person's identity via SkipGenie and write the result to DB. Handles search + best-match selection + DB write internally. Returns slim identity {matched, subject_name, dob, dod, deceased, last_address, possible_relatives}. Use INSTEAD of calling SkipGenie (Orch) directly — avoids large raw results in context. PAID — call only once per person. Pass: first_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name.",
         "text": "={{ `Resolve identity for person.\n\nFirst Name: ${$fromAI(\"first_name\", \"First name\")}\nLast Name: ${$fromAI(\"last_name\", \"Last name\")}\nStreet Address: ${$fromAI(\"street_address\", \"Property street address\", \"string\", \"\")}\nCity: ${$fromAI(\"city\", \"City\", \"string\", \"\")}\nZip: ${$fromAI(\"zip_code\", \"ZIP code\", \"string\", \"\")}\nState: ${$fromAI(\"state\", \"State\", \"string\", \"NC\")}\nSession ID: ${$fromAI(\"session_id\", \"Session ID\")}\nProperty ID: ${$fromAI(\"property_id\", \"Property ID\")}\nPerson Name: ${$fromAI(\"person_name\", \"Full name as queued\")}` }}",
         "options": {
-          "systemMessage": "You are the SkipGenie Identity Resolver. Find and confirm the identity of ONE person using SkipGenie and write the result to the database.\n\n## Input (from parent agent)\nfirst_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name (as queued)\n\n## Steps\n\n1. Call SkipGenie (SR) with ALL provided address fields: first_name, last_name, street_address, city, zip_code, state. The property address is the best geographic anchor — family members typically lived nearby.\n\n2. Select the best match using address cross-check:\n   - REQUIRED: the result's last_address city OR zip must match the property city/zip. If no result has a matching address, matched=false — do not accept a name-only match.\n   - Prefer: deceased=true if person is expected to be deceased\n   - Prefer: address on same street or in same zip as property (chain of ownership addresses are the strongest anchor)\n   - Prefer: possible_relatives contains known family names\n   - If multiple results pass the address check, prefer the one with the closest address match\n   - If no result passes address cross-check: matched=false\n\n3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status=\"unknown\", research_phase=\"skipgenie\", matched_identity.\n\n4. Return ONLY this JSON:\n{\n  \"matched\": true/false,\n  \"subject_name\": \"...\",\n  \"age\": \"...\",\n  \"dob\": \"...\",\n  \"dod\": \"...\",\n  \"deceased\": true/false,\n  \"last_address\": \"...\",\n  \"city\": \"...\",\n  \"state\": \"...\",\n  \"possible_relatives\": [{\"name\": \"...\", \"age\": \"...\", \"pid\": \"...\"}],\n  \"pid\": \"...\",\n  \"notes\": \"Brief match rationale.\"\n}",
+          "systemMessage": "You are the SkipGenie Identity Resolver. Find and confirm the identity of ONE person using SkipGenie and write the result to the database.\n\n## Input (from parent agent)\nfirst_name, last_name, street_address, city, zip_code, state, session_id, property_id, person_name (as queued)\n\n## Steps\n\n1. Call SkipGenie (SR) with ALL provided address fields: first_name, last_name, street_address, city, zip_code, state. The property address is the best geographic anchor — family members typically lived nearby.\n\n2. Select the best match using address cross-check:\n   - REQUIRED: the result's last_address city OR zip must match the property city/zip. If no result has a matching address, matched=false — do not accept a name-only match.\n   - Prefer: deceased=true if person is expected to be deceased\n   - Prefer: address on same street or in same zip as property (chain of ownership addresses are the strongest anchor)\n   - Prefer: possible_relatives contains known family names\n   - If multiple results pass the address check, prefer the one with the closest address match\n   - If no result passes address cross-check: matched=false\n\n3. Call Write Person (SR) IMMEDIATELY — even if matched=false (write empty identity to mark as checked). Required: session_id, property_id, input_name=person_name, vital_status=\"unknown\", research_phase=\"skipgenie\", matched_identity.\n   - If matched=true, also pass contact_phones (array of phone strings) and contact_emails (array of email strings) from the matched result. These are saved for eventual outreach.\n   - Example: contact_phones=[\"(919) 555-1234\", \"(919) 555-5678\"], contact_emails=[\"john@example.com\"]\n\n4. Return ONLY this JSON:\n{\n  \"matched\": true/false,\n  \"subject_name\": \"...\",\n  \"age\": \"...\",\n  \"dob\": \"...\",\n  \"dod\": \"...\",\n  \"deceased\": true/false,\n  \"last_address\": \"...\",\n  \"city\": \"...\",\n  \"state\": \"...\",\n  \"phones\": [\"...\"],\n  \"emails\": [\"...\"],\n  \"possible_relatives\": [{\"name\": \"...\", \"age\": \"...\", \"pid\": \"...\"}],\n  \"pid\": \"...\",\n  \"notes\": \"Brief match rationale.\"\n}",
           "maxIterations": 8
         }
       }
@@ -1076,7 +1076,7 @@
         "url": "http://scraper-staging:8000/heir/upsert-person",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"skipgenie\"),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"notes\":             $fromAI(\"notes\", \"Notes\", \"string\", \"\")\n} }}"
+        "jsonBody": "={{ {\n  \"session_id\":        $fromAI(\"session_id\", \"Session ID\"),\n  \"property_id\":       $fromAI(\"property_id\", \"Property ID\"),\n  \"input_name\":        $fromAI(\"input_name\", \"Person name as queued\"),\n  \"vital_status\":      $fromAI(\"vital_status\", \"living|deceased|unknown\"),\n  \"research_phase\":    $fromAI(\"research_phase\", \"skipgenie|vital_status|complete\", \"string\", \"skipgenie\"),\n  \"matched_identity\":  $fromAI(\"matched_identity\", \"SkipGenie matched identity\", \"json\", {}),\n  \"contact_phones\":    $fromAI(\"contact_phones\", \"Phone numbers from SkipGenie result\", \"json\", []),\n  \"contact_emails\":    $fromAI(\"contact_emails\", \"Email addresses from SkipGenie result\", \"json\", []),\n  \"notes\":             $fromAI(\"notes\", \"Notes\", \"string\", \"\")\n} }}"
       }
     },
     {
@@ -1159,7 +1159,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://heirmatrix-n8n-staging:5678/webhook/heir-orchestrator",
+        "url": "http://localhost:5678/webhook/heir-orchestrator",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {\n  \"session_id\":        $('Orchestrator Webhook').first().json.body.session_id,\n  \"property_id\":       $('Orchestrator Webhook').first().json.body.property_id,\n  \"county\":            $('Orchestrator Webhook').first().json.body.county || '',\n  \"person_name\":       $('Check Queue Status (Orch)').first().json.item.person_name,\n  \"relationship_hint\": $('Check Queue Status (Orch)').first().json.item.relationship_hint || '',\n  \"maiden_name\":       $('Check Queue Status (Orch)').first().json.item.maiden_name || '',\n  \"queue_id\":          $('Check Queue Status (Orch)').first().json.item.queue_id\n} }}",
@@ -1179,7 +1179,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://heirmatrix-n8n-staging:5678/webhook/heir-family-assembly",
+        "url": "http://localhost:5678/webhook/heir-family-assembly",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ {\n  \"session_id\":  $('Orchestrator Webhook').first().json.body.session_id,\n  \"property_id\": $('Orchestrator Webhook').first().json.body.property_id\n} }}",
@@ -2216,7 +2216,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "530ba561-3949-4bf3-aa9a-fa33324fef73",
+  "versionId": "10943a79-5f67-41c4-97e9-bb3052bf7987",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },
