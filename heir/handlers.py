@@ -983,6 +983,116 @@ def load_ancestry_records(data: dict) -> tuple[int, dict]:
 
 
 # ---------------------------------------------------------------------------
+# POST /heir/apply-probate-finding
+# ---------------------------------------------------------------------------
+def apply_probate_finding(data: dict) -> tuple[int, dict]:
+    """
+    Atomically apply a probate filing as ground truth for a session.
+
+    - Updates the researched person: estate_filed=true, cascade_needed=false,
+      cascade_relatives=named_persons, research_phase=complete
+    - Retires all pending/processing queue entries NOT in named_persons
+      (marks them resolved_by_probate)
+    - Queues named_persons that are not yet researched or queued
+
+    Required: session_id, property_id, person_name, named_persons (list of
+              {name, relationship_hint})
+    Optional: case_number, case_url, had_will
+    """
+    session_id   = data.get("session_id")
+    property_id  = data.get("property_id")
+    person_name  = (data.get("person_name") or "").strip()
+    named_persons = data.get("named_persons") or []
+    case_number  = (data.get("case_number") or "").strip() or None
+    case_url     = (data.get("case_url") or "").strip() or None
+    had_will     = _parse_bool(data.get("had_will"))
+
+    if not session_id or not property_id or not person_name:
+        return 400, {"error": "session_id, property_id, person_name required"}
+
+    try:
+        session_id = int(session_id)
+    except (ValueError, TypeError):
+        return 400, {"error": f"session_id must be integer, got {session_id!r}"}
+
+    named_names = [p.get("name", "").strip() for p in named_persons if p.get("name", "").strip()]
+    named_upper = {n.upper() for n in named_names}
+
+    with get_conn() as conn:
+        with dict_cursor(conn) as cur:
+
+            # 1. Update the researched person record
+            cur.execute("""
+                UPDATE heir_research_persons
+                SET estate_filed      = true,
+                    had_will          = %s,
+                    cascade_needed    = false,
+                    cascade_relatives = %s,
+                    research_phase    = 'complete',
+                    updated_at        = NOW()
+                WHERE session_id = %s AND UPPER(input_name) = UPPER(%s)
+            """, (
+                had_will,
+                _dump(named_persons),
+                session_id, person_name,
+            ))
+
+            # 2. Retire queue entries NOT in named_persons
+            cur.execute("""
+                UPDATE heir_research_queue
+                SET status = 'resolved_by_probate', completed_at = NOW()
+                WHERE session_id = %s
+                  AND status IN ('pending', 'processing')
+                  AND UPPER(person_name) != ALL(%s)
+            """, (session_id, list(named_upper)))
+            retired_count = cur.rowcount
+
+            # 3. Find already-researched and already-queued names
+            cur.execute("""
+                SELECT UPPER(input_name) AS n FROM heir_research_persons
+                WHERE session_id = %s
+            """, (session_id,))
+            already_researched = {r["n"] for r in cur.fetchall()}
+
+            cur.execute("""
+                SELECT UPPER(person_name) AS n FROM heir_research_queue
+                WHERE session_id = %s AND status IN ('pending', 'processing')
+            """, (session_id,))
+            already_queued = {r["n"] for r in cur.fetchall()}
+
+            # 4. Queue named_persons not yet researched or queued
+            queued = []
+            for p in named_persons:
+                name = p.get("name", "").strip()
+                if not name:
+                    continue
+                if name.upper() in already_researched or name.upper() in already_queued:
+                    continue
+                rel = (p.get("relationship_hint") or "heir").strip()
+                cur.execute("""
+                    INSERT INTO heir_research_queue
+                        (session_id, property_id, person_name, relationship_hint, depth, status)
+                    VALUES (%s, %s, %s, %s, 1, 'pending')
+                    ON CONFLICT DO NOTHING
+                    RETURNING id
+                """, (session_id, property_id, name, rel))
+                row = cur.fetchone()
+                if row:
+                    queued.append({"name": name, "queue_id": row["id"]})
+
+        conn.commit()
+
+    return 200, {
+        "applied": True,
+        "person_name": person_name,
+        "named_persons": named_names,
+        "retired_queue_entries": retired_count,
+        "newly_queued": queued,
+        "case_number": case_number,
+    }
+
+
+# ---------------------------------------------------------------------------
 # POST /heir/write-court-findings
 # ---------------------------------------------------------------------------
 def write_court_findings(data: dict) -> tuple[int, dict]:

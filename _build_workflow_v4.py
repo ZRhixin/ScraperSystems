@@ -260,6 +260,7 @@ NID = {k: nid(k) for k in [
     "Write Person (Orch)",
     "Write Voter Record (Orch)",
     "Queue Persons (Orch)",
+    "Apply Probate Finding (Orch)",
 
     # Orchestrator tools — sub-agents (HTTP webhook)
     "Court Researcher Tool",
@@ -520,11 +521,7 @@ One invocation = one person. New persons discovered (children from an obit, bene
 
 **Court research (for every deceased person — always):**
 6. Court Researcher Tool (sub-agent) — pass person_name, county, session_id, property_id. It handles Court Search variants, ROA, and Document Pull internally. Returns {estate_filed, had_will, case_number, case_url, named_persons[], notes}.
-   - **Probate is ground truth.** If estate_filed=true with named_persons: this is a legal record and supersedes ALL other sources (SkipGenie, obituary, census). Immediately:
-     a. Set cascade_needed=false, cascade_relatives = named_persons list.
-     b. Queue ONLY the probate named_persons — retire any previously queued persons who are now resolved by this filing.
-     c. Call Load Person (Orch) for each already-researched person in this session. If any of them appear in named_persons, update their record with estate confirmation. If any queued persons are NOT in named_persons, mark them as resolved_by_probate and remove from active queue.
-     d. Write person with estate_filed=true, had_will, cascade_needed=false. Done — do NOT continue to obituary/census for this person.
+   - **Probate is ground truth.** If estate_filed=true with named_persons: call **Apply Probate Finding (Orch)** immediately — pass session_id, property_id, person_name, named_persons, case_number, case_url, had_will. This single call atomically: updates the person record (estate_filed=true, cascade_needed=false), retires all queue entries not in named_persons, and queues the named_persons as the authoritative heir list. Probate supersedes ALL other sources. Do NOT continue to obituary/census after this call.
    - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], branch permanently closed.
 
 **Obituary research (only if no probate found with named persons):**
@@ -867,6 +864,31 @@ queue_persons_orch = http_tool(
     ),
     f"{BASE}/heir/queue-persons",
     '={{ { "session_id": $fromAI("session_id", "Session ID"), "property_id": $fromAI("property_id", "Property ID"), "depth": $fromAI("depth", "Depth level for cascade", "number", 1), "persons": $fromAI("persons", "Array of {name, relationship_hint, maiden_name} to queue", "json", []) } }}',
+)
+
+apply_probate_orch = http_tool(
+    "Apply Probate Finding (Orch)", NID["Apply Probate Finding (Orch)"],
+    (
+        "PROBATE GROUND TRUTH — call this immediately when Court Researcher returns estate_filed=true "
+        "with named_persons. Atomically: updates person record (estate_filed=true, cascade_needed=false, "
+        "cascade_relatives=named_persons), retires all queue entries NOT in named_persons "
+        "(marked resolved_by_probate), and queues the named_persons as the authoritative heir list. "
+        "One call replaces 5+ manual steps. Probate supersedes SkipGenie, obituary, and census. "
+        "Required: session_id, property_id, person_name, named_persons=[{name, relationship_hint}]. "
+        "Optional: case_number, case_url, had_will."
+    ),
+    f"{BASE}/heir/apply-probate-finding",
+    (
+        '={{ { '
+        '"session_id": $fromAI("session_id", "Session ID"), '
+        '"property_id": $fromAI("property_id", "Property ID"), '
+        '"person_name": $fromAI("person_name", "Name of person whose probate was found"), '
+        '"named_persons": $fromAI("named_persons", "Array of {name, relationship_hint} from probate", "json", []), '
+        '"case_number": $fromAI("case_number", "Probate case number", "string", ""), '
+        '"case_url": $fromAI("case_url", "Probate case URL", "string", ""), '
+        '"had_will": $fromAI("had_will", "true/false/null", "boolean", null) '
+        '} }}'
+    ),
 )
 
 # ── Court Researcher Tool (sub-agent call) ────────────────────────────────────
@@ -1414,7 +1436,7 @@ all_nodes = [
     # DB read tools
     load_prop_state_orch, load_person_orch, load_anc_orch, load_court_orch, load_voter_orch,
     # DB write tools
-    write_person_orch, write_voter_orch, queue_persons_orch,
+    write_person_orch, write_voter_orch, queue_persons_orch, apply_probate_orch,
     # Sub-agent tools
     court_researcher_tool,
     # Obituary Research Agent (AI tool)
@@ -1499,9 +1521,10 @@ connections = {
     "Load Court Findings (Orch)":    {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     "Load Voter Records (Orch)":     {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     # DB write tools → agent
-    "Write Person (Orch)":           {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
-    "Write Voter Record (Orch)":     {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
-    "Queue Persons (Orch)":          {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "Write Person (Orch)":              {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "Write Voter Record (Orch)":        {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "Queue Persons (Orch)":             {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
+    "Apply Probate Finding (Orch)":     {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     # Sub-agent tools → orchestrator
     "Court Researcher Tool":         {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
     "Obituary Research Agent":       {"ai_tool": [[ai_tool("Heir Research Orchestrator")]]},
@@ -1616,7 +1639,8 @@ POS: dict[str, list[int]] = {
     "Write Person (Orch)":          [520,  1820],
     "Write Voter Record (Orch)":    [520,  2000],
     "Queue Persons (Orch)":         [520,  2180],
-    "Court Researcher Tool":        [520,  2360],
+    "Apply Probate Finding (Orch)": [520,  2360],
+    "Court Researcher Tool":        [520,  2540],
     # AI sub-agent tools (col 4: x=740)
     "Obituary Research Agent":      [740,  1820],
     "SkipGenie Resolver Agent":     [740,  2000],

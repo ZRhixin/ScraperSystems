@@ -106,6 +106,7 @@ from heir.handlers import (
     load_court_findings as heir_load_court_findings,
     upsert_person as heir_upsert_person,
     load_person as heir_load_person,
+    apply_probate_finding as heir_apply_probate_finding,
 )
 
 _lock = threading.Lock()
@@ -853,6 +854,7 @@ _ROUTES: dict[str, callable] = {
     "/heir/voter-records":                       lambda d: heir_load_voter(d),
     "/heir/write-deed-finding":                  lambda d: heir_write_deed_finding(d),
     "/heir/write-court-findings":                lambda d: heir_write_court_findings(d),
+    "/heir/apply-probate-finding":               lambda d: heir_apply_probate_finding(d),
     "/heir/court-findings":                      lambda d: heir_load_court_findings(d),
     # v3 progressive DB writes and person lookup
     "/heir/upsert-person":                       lambda d: heir_upsert_person(d),
