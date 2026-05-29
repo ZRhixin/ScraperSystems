@@ -525,7 +525,14 @@ One invocation = one person. New persons discovered (children from an obit, bene
    - If named_persons[x].has_issue=false → cascade_needed=false, cascade_relatives=[], branch permanently closed.
 
 **Obituary research (only if no probate found with named persons):**
-7. Call Obituary Research Agent (AI tool) — runs Ancestry + Perplexity + Brave in parallel, cross-validates all findings, and returns ONLY a confirmed match. Pass: first_name, last_name, death_year, death_location="[County], North Carolina", session_id, property_id. Also pass when known: maiden_name, known_relatives, root_dob_year, root_relationship, property_city, known_spouse. Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, sources_found, notes}. A null result means no source found a confirmed match — do not retry with individual tools.
+7. Call Obituary Research Agent (AI tool). Before calling, build the search profile from all available data:
+   - middle_name: from deed records or SkipGenie result
+   - skipgenie_dob / skipgenie_age: from SkipGenie Resolver result (if matched=true)
+   - last_deed_year: the year the person last appeared as grantor in Load Property State deed chain — strongest death year anchor
+   - confirmed_siblings: names of already-researched persons with same parent (from prior queue iterations)
+   - known_relatives: all other researched persons in this session
+   Pass ALL available fields — each one significantly narrows the search and reduces false matches.
+   Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, sources_found, notes}. A null result means no source found a confirmed match — do not retry with individual tools.
 8. Only call Ancestry Search Save (Orch) directly if Obituary Research Agent returns found=false AND you need a census/SSDI search (collection_id=2442 — NOT 61843 which is the obit index already searched by the agent).
 10. Fetch Obituary Page (Orch) — only after Brave Search found a promising non-Ancestry URL.
 
@@ -915,22 +922,36 @@ OBITUARY_RESEARCH_PROMPT = """You are the Obituary Research Agent. Your job is t
 
 ## Input (from parent agent)
 first_name, last_name, death_year, death_location, session_id, property_id
-Optional context (use when provided):
+Optional context (use ALL when provided — each one narrows the search and improves match accuracy):
+- middle_name — middle name or initial if known from deed or SkipGenie
 - maiden_name — birth surname if person married
-- known_relatives — comma-separated names of known family members
+- known_relatives — comma-separated confirmed family members (siblings, children already researched)
 - root_dob_year — birth year of root decedent (for generation gap check)
 - root_relationship — this person's relationship to root (e.g. "child", "grandchild")
 - property_city — city of the property
 - known_spouse — spouse name if known
+- skipgenie_dob — date of birth from SkipGenie (use to compute exact birth_year for Ancestry search)
+- skipgenie_age — age from SkipGenie (use as dob estimate: birth_year ≈ death_year - age)
+- last_deed_year — year person last appeared on a deed as grantor (strong death year anchor: death likely within 0-8 years after)
+- confirmed_siblings — names of already-confirmed siblings from prior research (strongest relative signal)
+
+## Pre-search: Build expected profile
+Before searching, compute from available inputs:
+- expected_birth_year: use skipgenie_dob if available, else (death_year - skipgenie_age) if age known, else estimate from generation
+- death_year_window: if last_deed_year provided → death likely between last_deed_year and last_deed_year+8. Tighten death_year to this window.
+- Use middle_name in all searches when provided — dramatically reduces false matches for common names
 
 ## Step 1 — Run all three sources
 
 **A. Ancestry (structured obit index)**
 Call Ancestry Search Save (AS) with first_name, last_name, death_year, death_location, collection_id="61843", session_id, property_id.
+If birth_year is computable from profile → pass it too (tightens results significantly).
+If middle_name provided → include in first_name field (e.g. "Mary E" or "Mary Elizabeth").
 
 **B. Perplexity (web-wide synthesis)**
-Call Perplexity (ORA) with query: "[FIRST NAME] [LAST NAME] [PROPERTY CITY] NC obituary [DEATH YEAR]"
+Call Perplexity (ORA) with query: "[FIRST NAME] [MIDDLE NAME] [LAST NAME] [PROPERTY CITY] NC obituary [DEATH YEAR]"
 Perplexity searches newspapers, legacy.com, findagrave, funeral home sites, and synthesizes the answer.
+Include middle name in query if provided — key differentiator for common names like Mary, John, James.
 
 **C. Brave Search (raw URL fallback)**
 Call Brave Search (ORA) with query: "[FIRST NAME] [LAST NAME] [PROPERTY CITY] NC obituary [DEATH YEAR]"
@@ -942,19 +963,23 @@ If a promising non-Ancestry URL is found → call Fetch Obituary Page (ORA) to r
 - death_location is outside North Carolina → reject
 - dod before 1960 → reject
 - Generation gap impossible: if root_dob_year provided and root_relationship="child", candidate dob must be ≥ 15 years after root_dob_year → reject if not
+- dod year is OUTSIDE last_deed_year to last_deed_year+8 window (if last_deed_year provided) → reject
 
 ### Scoring signals:
 | Signal | Points |
 |---|---|
 | First name matches (case-insensitive) | +4 |
+| Middle name / initial matches | +3 |
 | Last name OR maiden_name matches | +3 |
 | death_location is property county/city | +3 |
 | Parent listed in record matches root decedent name | +5 |
+| Confirmed sibling name appears in record | +4 per match |
 | Known relative name appears in record | +3 per match |
-| dod year within ±2 of death_year | +2 |
-| dob plausible for expected generation | +2 |
+| dod year within ±2 of death_year OR within last_deed_year window | +2 |
+| dob matches expected_birth_year ±3 | +3 |
 | Known spouse name appears | +3 |
 | Property address / city / street appears in record | +4 |
+| Obituary text mentions "survived by" a known relative | +3 |
 | First name does NOT match AND maiden_name does NOT match | -3 |
 
 ## Step 3 — Synthesis (CRITICAL)
@@ -992,12 +1017,15 @@ obituary_research_agent = agent_tool_node(
         "Returns {found, person_name, dob, dod, children[], obit_text, confidence, score, sources_found, notes}. "
         "A null result is returned when no source finds a confident match — never returns a weak guess. "
         "Pass: first_name, last_name, death_year, death_location, session_id, property_id. "
-        "Also pass when known: maiden_name, known_relatives, root_dob_year, root_relationship, property_city, known_spouse."
+        "Also pass when known: middle_name, maiden_name, known_relatives, confirmed_siblings, "
+        "root_dob_year, root_relationship, property_city, known_spouse, "
+        "skipgenie_dob, skipgenie_age, last_deed_year."
     ),
     system_msg=OBITUARY_RESEARCH_PROMPT,
     text_expr=(
         '={{ `Research obituary from all sources.\n\n'
         'First Name: ${$fromAI("first_name", "First name")}\n'
+        'Middle Name: ${$fromAI("middle_name", "Middle name or initial if known", "string", "")}\n'
         'Last Name: ${$fromAI("last_name", "Last name")}\n'
         'Death Year: ${$fromAI("death_year", "Estimated death year", "string", "")}\n'
         'Death Location: ${$fromAI("death_location", "e.g. Wake, North Carolina", "string", "")}\n'
@@ -1005,10 +1033,14 @@ obituary_research_agent = agent_tool_node(
         'Property ID: ${$fromAI("property_id", "Property ID")}\n'
         'Maiden Name: ${$fromAI("maiden_name", "Birth surname if person married", "string", "")}\n'
         'Known Relatives: ${$fromAI("known_relatives", "Comma-separated names of known relatives", "string", "")}\n'
+        'Confirmed Siblings: ${$fromAI("confirmed_siblings", "Already-confirmed siblings from prior research", "string", "")}\n'
         'Root DOB Year: ${$fromAI("root_dob_year", "Birth year of root decedent", "string", "")}\n'
         'Root Relationship: ${$fromAI("root_relationship", "Relationship to root decedent", "string", "")}\n'
         'Property City: ${$fromAI("property_city", "City where property is located", "string", "")}\n'
-        'Known Spouse: ${$fromAI("known_spouse", "Name of known spouse if any", "string", "")}` }}'
+        'Known Spouse: ${$fromAI("known_spouse", "Name of known spouse if any", "string", "")}\n'
+        'SkipGenie DOB: ${$fromAI("skipgenie_dob", "DOB from SkipGenie if available", "string", "")}\n'
+        'SkipGenie Age: ${$fromAI("skipgenie_age", "Age from SkipGenie result", "string", "")}\n'
+        'Last Deed Year: ${$fromAI("last_deed_year", "Year person last appeared on a deed as grantor", "string", "")}` }}'
     ),
     max_iter=15,
 )
