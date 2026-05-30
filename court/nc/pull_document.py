@@ -151,28 +151,9 @@ def _get_case_documents_via_playwright(roa_url: str) -> tuple[list[dict], list[d
                 args=["--no-sandbox", "--disable-dev-shm-usage"],
             )
             ctx  = browser.new_context(viewport={"width": 1280, "height": 900}, user_agent=_UA)
-
-            # Inject saved WAF + session cookies so we skip CAPTCHA when token is still valid
-            if _TOKEN_FILE.exists():
-                try:
-                    saved = json.loads(_TOKEN_FILE.read_text())
-                    for c in saved.get("cookies", []):
-                        try:
-                            ctx.add_cookies([{
-                                "name":   c["name"],
-                                "value":  c["value"],
-                                "domain": c.get("domain", ".tylertech.cloud"),
-                                "path":   c.get("path", "/"),
-                            }])
-                        except Exception:
-                            pass
-                    print("[pull_document] Injected saved session cookies — CAPTCHA should be skipped.")
-                except Exception:
-                    pass
-
             page = ctx.new_page()
 
-            # Step 1: portal home — solve CAPTCHA only if token expired/missing
+            # Step 1: portal home — solve CAPTCHA
             print("[pull_document] Opening portal. Solve CAPTCHA if prompted...")
             page.goto(_PORTAL_URL, timeout=60000)
             deadline = time.time() + 600

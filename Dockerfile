@@ -24,11 +24,6 @@ RUN chmod +x start.sh
 ENV PORT=8000
 ENV SCRAPER_DEBUG=0
 ENV DISPLAY=:99
-ENV COURT_SESSION_DIR=/data/court_session
-
-RUN mkdir -p /data/court_session
-
-VOLUME ["/data/court_session"]
 
 EXPOSE 8000
 EXPOSE 6080
