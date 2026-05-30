@@ -199,6 +199,7 @@ def search_by_name(name: str, county: str = "") -> list[dict]:
     results (dedup by case_number). Stops at the first variant that yields
     any estate hit, or returns the union of all variants tried.
     """
+    county = county.strip().title() if county else ""
     court_location = f"{county} County" if county and not county.lower().endswith("county") else (county or "All Locations")
 
     variants = _name_variants(name)
