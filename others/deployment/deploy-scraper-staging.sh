@@ -34,6 +34,7 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 [[ -n "${SCRAPER_DB_URL:-}" ]] || die "SCRAPER_DB_URL is not set. Add it to $ENV_FILE or export it."
+[[ -n "${PROXY_HOST:-}" ]]    || warn "PROXY_HOST not set — SkipGenie will run without a proxy."
 
 # ---------------------------------------------------------------------------
 # Build
@@ -65,7 +66,10 @@ docker run -d \
     -v court_session:/data/court_session \
     -e PORT=8000 \
     -e SCRAPER_DEBUG=0 \
+    -e PROXY_HOST="${PROXY_HOST:-}" \
     -e PROXY_PORT="${PROXY_PORT:-12321}" \
+    -e PROXY_USER="${PROXY_USER:-}" \
+    -e PROXY_PASS="${PROXY_PASS:-}" \
     -e SCRAPER_DB_URL="$SCRAPER_DB_URL" \
     "$IMAGE"
 
