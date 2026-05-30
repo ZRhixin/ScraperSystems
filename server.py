@@ -402,6 +402,8 @@ def _nc_pull_document(data: dict) -> tuple[int, dict]:
         return 400, {"error": "url is required"}
     if not url.startswith(("http://", "https://")):
         return 400, {"error": "url must start with http:// or https://"}
+    if "portal-nc.tylertech.cloud" not in url:
+        return 400, {"error": f"invalid_url: only portal-nc.tylertech.cloud URLs are accepted. Got: {url[:120]}"}
 
     result = pull_court_document(url)
     return 200, result
@@ -420,6 +422,8 @@ def _nc_court_roa(data: dict) -> tuple[int, dict]:
     case_url = (data.get("case_url") or "").strip()
     if not case_url:
         return 400, {"error": "case_url is required (from register_of_actions_url in search results)"}
+    if "portal-nc.tylertech.cloud" not in case_url:
+        return 400, {"error": f"invalid_url: only portal-nc.tylertech.cloud URLs are accepted. Got: {case_url[:120]}"}
 
     events = nc_court_roa(case_url)
 
