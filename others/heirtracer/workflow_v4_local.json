@@ -1276,9 +1276,19 @@
         "method": "POST",
         "url": "http://127.0.0.1:8000/court/nc/search",
         "sendBody": true,
-        "options": {},
-        "specifyBody": "json",
-        "jsonBody": "={{ { \"name\": $fromAI(\"name\", \"Person name in LAST, FIRST format (e.g. HAYES, LYDIA)\"), \"county\": $fromAI(\"county\", \"County\", \"string\", null) } }}"
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $fromAI('name', 'Full name or last name to search, e.g. HAYES or HAYES, LYDIA') }}"
+            },
+            {
+              "name": "county",
+              "value": "={{ $fromAI('county', 'County name to filter results, leave empty for statewide search') }}"
+            }
+          ]
+        },
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.4,
@@ -2230,7 +2240,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "47fc1cbe-1719-4307-90cd-01b83b7c490d",
+  "versionId": "10943a79-5f67-41c4-97e9-bb3052bf7987",
   "meta": {
     "instanceId": "dfce313ceb739541efe69c8b1dfa9f66f8131d2289da9d81c960be5cd9159a8a"
   },
